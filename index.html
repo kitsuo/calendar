@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en"> 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Calendar</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@4.1.0/cdn.min.js"</script>
+    <script>
+        // Make date-fns globally accessible if modules expect it (needed for our current setup)
+        window.dateFns = dateFns;
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+    <div class="calendar-container">
+        <aside class="sidebar left-sidebar">
+            <div id="day-info">
+                </div>
+            <hr>
+            <h2 id="upcoming-title">Upcoming Holidays</h2>
+            <div id="upcoming-error-message" class="error-message" role="alert">
+                <button id="retry-upcoming-btn" class="retry-button" hidden><i class="fas fa-redo"></i> <span class="retry-text">Retry</span></button>
+            </div>
+            <ul id="upcoming-holidays-list">
+                <li class="skeleton-item"></li>
+                <li class="skeleton-item"></li>
+                <li class="skeleton-item"></li>
+            </ul>
+        </aside>
+
+        <main class="main-content">
+            <div class="calendar-header">
+                <div class="view-switcher">
+                    <label for="view-select" class="sr-only" id="view-label">Select View</label>
+                    <select id="view-select" aria-labelledby="view-label">
+                        <option value="month">Month</option>
+                        <option value="week">Week</option>
+                        <option value="year">Year</option>
+                    </select>
+                </div>
+                 <div class="controls">
+                    <button id="prev-btn" aria-label="Previous Period">&laquo;</button>
+                    <select id="month-select" aria-label="Select Month"></select>
+                    <input type="number" id="year-input" aria-label="Select Year">
+                    <button id="next-btn" aria-label="Next Period">&#8250;</button>
+                    <button id="today-btn" aria-label="Go to Today"><i class="fas fa-calendar-day"></i> Today</button>
+                 </div>
+                 <div class="date-jumper">
+                     <label for="date-jump">Jump to:</label>
+                     <input type="date" id="date-jump">
+                     <div id="date-jump-error" class="input-error-message" aria-live="polite"></div>
+                 </div>
+
+                 <div class="search-feature">
+                    <label for="holiday-search" class="sr-only" id="search-label">Search Holidays</label>
+                    <input type="search" id="holiday-search" placeholder="Search holidays..." aria-labelledby="search-label">
+                    <button id="search-btn" aria-label="Search Holidays"><i class="fas fa-search"></i></button>
+                 </div>
+
+                 <div class="country-selector">
+                    <label for="country-select">Country:</label>
+                    <select id="country-select">
+                        <option value="AX">Åland Islands</option>
+                        <option value="AL">Albania</option>
+                        <option value="AD">Andorra</option>
+                        <option value="AR">Argentina</option>
+                        <option value="AM">Armenia</option>
+                        <option value="AU">Australia</option>
+                        <option value="AT">Austria</option>
+                        <option value="BS">Bahamas</option>
+                        <option value="BB">Barbados</option>
+                        <option value="BY">Belarus</option>
+                        <option value="BE">Belgium</option>
+                        <option value="BZ">Belize</option>
+                        <option value="BJ">Benin</option>
+                        <option value="BO">Bolivia</option>
+                        <option value="BA">Bosnia and Herzegovina</option>
+                        <option value="BW">Botswana</option>
+                        <option value="BR">Brazil</option>
+                        <option value="BG">Bulgaria</option>
+                        <option value="CA">Canada</option>
+                        <option value="CL">Chile</option>
+                        <option value="CN">China</option>
+                        <option value="CO">Colombia</option>
+                        <option value="CR">Costa Rica</option>
+                        <option value="HR">Croatia</option>
+                        <option value="CU">Cuba</option>
+                        <option value="CY">Cyprus</option>
+                        <option value="CZ">Czechia</option>
+                        <option value="DK">Denmark</option>
+                        <option value="DO">Dominican Republic</option>
+                        <option value="EC">Ecuador</option>
+                        <option value="EG">Egypt</option>
+                        <option value="SV">El Salvador</option>
+                        <option value="EE">Estonia</option>
+                        <option value="FO">Faroe Islands</option>
+                        <option value="FI">Finland</option>
+                        <option value="FR">France</option>
+                        <option value="GA">Gabon</option>
+                        <option value="GM">Gambia</option>
+                        <option value="GE">Georgia</option>
+                        <option value="DE">Germany</option>
+                        <option value="GI">Gibraltar</option>
+                        <option value="GR">Greece</option>
+                        <option value="GL">Greenland</option>
+                        <option value="GD">Grenada</option>
+                        <option value="GT">Guatemala</option>
+                        <option value="GG">Guernsey</option>
+                        <option value="GY">Guyana</option>
+                        <option value="HT">Haiti</option>
+                        <option value="HN">Honduras</option>
+                        <option value="HK">Hong Kong</option>
+                        <option value="HU">Hungary</option>
+                        <option value="IS">Iceland</option>
+                        <option value="ID">Indonesia</option>
+                        <option value="IE">Ireland</option>
+                        <option value="IM">Isle of Man</option>
+                        <option value="IT">Italy</option>
+                        <option value="JM">Jamaica</option>
+                        <option value="JP">Japan</option>
+                        <option value="JE">Jersey</option>
+                        <option value="KZ">Kazakhstan</option>
+                        <option value="LV">Latvia</option>
+                        <option value="LS">Lesotho</option>
+                        <option value="LI">Liechtenstein</option>
+                        <option value="LT">Lithuania</option>
+                        <option value="LU">Luxembourg</option>
+                        <option value="MG">Madagascar</option>
+                        <option value="MT">Malta</option>
+                        <option value="MX">Mexico</option>
+                        <option value="MD">Moldova</option>
+                        <option value="MC">Monaco</option>
+                        <option value="MN">Mongolia</option>
+                        <option value="ME">Montenegro</option>
+                        <option value="MS">Montserrat</option>
+                        <option value="MA">Morocco</option>
+                        <option value="MZ">Mozambique</option>
+                        <option value="NA">Namibia</option>
+                        <option value="NL">Netherlands</option>
+                        <option value="NZ">New Zealand</option>
+                        <option value="NI">Nicaragua</option>
+                        <option value="NE">Niger</option>
+                        <option value="NG">Nigeria</option>
+                        <option value="MK">North Macedonia</option>
+                        <option value="NO">Norway</option>
+                        <option value="PA">Panama</option>
+                        <option value="PG">Papua New Guinea</option>
+                        <option value="PY">Paraguay</option>
+                        <option value="PE">Peru</option>
+                        <option value="PH">Philippines</option>
+                        <option value="PL">Poland</option>
+                        <option value="PT">Portugal</option>
+                        <option value="PR">Puerto Rico</option>
+                        <option value="RO">Romania</option>
+                        <option value="RU">Russia</option>
+                        <option value="SM">San Marino</option>
+                        <option value="RS">Serbia</option>
+                        <option value="SG">Singapore</option>
+                        <option value="SK">Slovakia</option>
+                        <option value="SI">Slovenia</option>
+                        <option value="ZA">South Africa</option>
+                        <option value="KR">South Korea</option>
+                        <option value="ES">Spain</option>
+                        <option value="SR">Suriname</option>
+                        <option value="SJ">Svalbard and Jan Mayen</option>
+                        <option value="SE">Sweden</option>
+                        <option value="CH">Switzerland</option>
+                        <option value="TN">Tunisia</option>
+                        <option value="TR">Turkey</option>
+                        <option value="UA">Ukraine</option>
+                        <option value="GB">United Kingdom</option>
+                        <option value="US">United States</option>
+                        <option value="UY">Uruguay</option>
+                        <option value="VA">Vatican City</option>
+                        <option value="VE">Venezuela</option>
+                        <option value="VN">Vietnam</option>
+                        <option value="ZW">Zimbabwe</option>
+                    </select>
+                 </div>
+                 <div class="lang-switch">
+                     <label for="lang-select">Lang:</label>
+                     <select id="lang-select">
+                         <option value="en">EN</option>
+                         <option value="fr">FR</option>
+                         <option value="de">DE</option>
+                     </select>
+                 </div>
+                 <div class="theme-switcher">
+                    <label for="theme-select" class="sr-only" id="theme-label">Select Theme</label>
+                    <select id="theme-select" aria-labelledby="theme-label">
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                    </select>
+                 </div>
+            </div>
+
+            <div id="search-results-container" class="search-results-container" aria-live="polite" hidden>
+                <h3 id="search-results-title">Search Results</h3>
+                <ul id="search-results-list">
+                    </ul>
+                <button id="close-search-results-btn" aria-label="Close Search Results">&times;</button>
+            </div>
+
+            <div id="api-error-message" class="error-message" role="alert">
+                 <button id="retry-holidays-btn" class="retry-button" hidden><i class="fas fa-redo"></i> <span class="retry-text">Retry</span></button>
+            </div>
+
+            <div class="calendar-view-container">
+                <div class="loading-overlay" hidden>
+                    <div class="spinner"></div>
+                </div>
+                <div class="calendar-weekdays">
+                    </div>
+                <div id="calendar-grid" class="calendar-grid month-view" role="grid" aria-live="polite">
+                    </div>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="js/main.js" type="module" defer></script>
+</body>
+</html>

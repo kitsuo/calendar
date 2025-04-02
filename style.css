@@ -1,0 +1,1027 @@
+/* style.css */
+:root {
+    /* Color Palette (Adjusted for better contrast, check specific combinations) */
+    --bg-main: #f8f6f2; /* Lighter beige */
+    --bg-sidebar: #ebe8e1; /* Slightly darker beige */
+    --bg-grid: #ffffff;
+    --bg-grid-other: #f5f5f5; /* Light grey for other month/year view */
+    --accent-light: #d0eaf0; /* Lighter blue */
+    --accent-medium: #8bcadd; /* Medium blue */
+    --accent-dark: #005f66; /* Darker teal */
+    --text-dark: #212121; /* Very dark grey */
+    --text-light: #ffffff;
+    --text-muted: #757575; /* Muted grey */
+    --border-color: #dcdcdc; /* Lighter border */
+    --today-bg: #fff59d; /* Light yellow */
+    --today-border: #fbc02d;
+    --holiday-bg: #b3e5fc; /* Light blue */
+    --holiday-public-bg: #b3e5fc;
+    --holiday-bank-bg: #c8e6c9; /* Light green for bank */
+    --holiday-optional-bg: #ffe0b2; /* Light orange for optional */
+    --holiday-text: #01579b; /* Dark blue text on holiday bg */
+    --selected-bg: var(--accent-dark);
+    --selected-text: var(--text-light);
+    --error-bg: #ffebee;
+    --error-text: #c62828;
+    --error-border: #ef9a9a;
+    --focus-outline: 2px solid #0d47a1; /* Stronger focus */
+    --skeleton-bg: #e0e0e0;
+    --spinner-color: var(--accent-dark);
+
+    /* Typography */
+    --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* Spacing */
+    --spacing-xs: 4px;
+    --spacing-s: 8px;
+    --spacing-m: 16px;
+    --spacing-l: 24px;
+}
+
+[data-theme="dark"] {
+    --bg-main: #212121;
+    --bg-sidebar: #303030;
+    --bg-grid: #424242;
+    --bg-grid-other: #505050;
+    --accent-light: #424b54;
+    --accent-medium: #6b7b8c;
+    --accent-dark: #90a4ae;
+    --text-dark: #e0e0e0; /* Light grey text */
+    --text-light: #121212; /* Very dark grey */
+    --text-muted: #9e9e9e;
+    --border-color: #555;
+    --today-bg: #403f33; /* Dark yellow */
+    --today-border: #a78c1c;
+    --holiday-bg: #3b505f; /* Dark blue */
+    --holiday-public-bg: #3b505f;
+    --holiday-bank-bg: #38503a; /* Dark green */
+    --holiday-optional-bg: #614d34; /* Dark orange */
+    --holiday-text: #b3e5fc; /* Light blue text */
+    --selected-bg: var(--accent-dark);
+    --selected-text: var(--text-light);
+    --error-bg: #3c2425;
+    --error-text: #ef9a9a;
+    --error-border: #c62828;
+    --focus-outline: 2px solid #82b1ff;
+    --skeleton-bg: #535353;
+    --spinner-color: var(--accent-dark);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: var(--font-main);
+    background-color: #e0e0e0; /* Page background */
+    color: var(--text-dark);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: var(--spacing-m);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.calendar-container {
+    display: flex;
+    background-color: var(--bg-main);
+    border-radius: var(--spacing-s);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    width: 100%;
+    max-width: 1300px; /* Increased max width */
+    min-height: 650px;
+    transition: background-color 0.3s ease;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    background-color: var(--bg-sidebar);
+    padding: var(--spacing-m);
+    overflow-y: auto;
+    width: 280px; /* Slightly wider sidebar */
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-color);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.sidebar h2 {
+    font-size: 1.2rem;
+    margin-bottom: var(--spacing-m);
+    color: var(--accent-dark);
+    transition: color 0.3s ease;
+}
+
+.sidebar hr {
+    border: 0;
+    border-top: 1px solid var(--border-color);
+    margin: var(--spacing-m) 0;
+    transition: border-color 0.3s ease;
+}
+
+#day-info {
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+#day-info p {
+    margin-bottom: var(--spacing-s);
+}
+#day-info .selected-date-display {
+    font-weight: 600; /* Slightly bolder */
+    color: var(--accent-dark);
+    font-size: 1.1em;
+    display: block; /* Ensure it takes its own line if needed */
+    margin-bottom: var(--spacing-xs);
+    transition: color 0.3s ease;
+}
+#day-info em { /* Today indicator */
+    font-style: normal;
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+#day-info .holiday-info {
+    margin-top: var(--spacing-s);
+    font-size: 0.9em;
+}
+#day-info .holiday-name {
+    font-weight: 600;
+}
+#day-info .holiday-type {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.9em;
+}
+#day-info .holiday-details {
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+#day-info .holiday-link {
+    font-size: 0.85em;
+    color: var(--accent-medium);
+    text-decoration: none;
+    margin-left: var(--spacing-xs);
+}
+#day-info .holiday-link:hover {
+    text-decoration: underline;
+}
+
+#upcoming-holidays-list {
+    list-style: none;
+    padding: 0;
+    font-size: 0.9rem;
+}
+#upcoming-holidays-list li {
+    margin-bottom: var(--spacing-m);
+    padding: var(--spacing-s);
+    border-radius: var(--spacing-xs);
+    background-color: var(--bg-main);
+    line-height: 1.4;
+    transition: background-color 0.3s ease;
+}
+.upcoming-holiday-name {
+    font-weight: 600;
+    color: var(--accent-dark);
+    transition: color 0.3s ease;
+}
+.upcoming-holiday-date {
+    display: block;
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+
+/* Skeleton Loader */
+.skeleton-item {
+    height: 50px; /* Adjust height as needed */
+    background-color: var(--skeleton-bg);
+    border-radius: var(--spacing-xs);
+    animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+/* Main Content Area */
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-m);
+    overflow: hidden; /* Prevent main content scroll */
+    position: relative; /* For loading overlay */
+}
+
+/* Header Styles */
+.calendar-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-m);
+    gap: var(--spacing-s) var(--spacing-m); /* Row and column gap */
+    padding-bottom: var(--spacing-m);
+    border-bottom: 1px solid var(--border-color);
+    transition: border-color 0.3s ease;
+}
+
+.calendar-header > div { /* Target direct children */
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-s);
+}
+
+.calendar-header label {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    color: var(--text-muted);
+    transition: color 0.3s ease;
+}
+.calendar-header label.sr-only { /* Screen reader only */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+.calendar-header select,
+.calendar-header input[type="number"],
+.calendar-header input[type="date"],
+.calendar-header input[type="search"],
+.calendar-header button {
+    padding: var(--spacing-s) var(--spacing-m);
+    font-size: 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--spacing-xs);
+    background-color: var(--bg-grid);
+    color: var(--text-dark);
+    height: 38px; /* Consistent height */
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+.calendar-header input[type="number"] {
+    width: 75px;
+    text-align: center;
+    -moz-appearance: textfield; /* Firefox */
+}
+.calendar-header input[type="number"]::-webkit-outer-spin-button,
+.calendar-header input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.calendar-header input[type="search"] {
+    width: 150px;
+}
+.calendar-header input[type="search"]::-webkit-search-cancel-button {
+    cursor: pointer;
+}
+
+.calendar-header button {
+    cursor: pointer;
+    background-color: var(--accent-medium);
+    color: var(--text-dark);
+    border-color: var(--accent-medium);
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+}
+
+.calendar-header button:hover {
+    background-color: var(--accent-dark);
+    border-color: var(--accent-dark);
+    color: var(--text-light);
+}
+.calendar-header button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#today-btn {
+    background-color: var(--accent-dark);
+    color: var(--text-light);
+    border-color: var(--accent-dark);
+}
+#today-btn:hover {
+    background-color: #004c50; /* Slightly darker */
+}
+
+/* Search Results */
+.search-results-container {
+    position: absolute;
+    top: 110px; /* Adjust as needed below header */
+    right: var(--spacing-m);
+    background-color: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: var(--spacing-xs);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    padding: var(--spacing-m);
+    z-index: 100;
+    max-height: 300px;
+    overflow-y: auto;
+    width: 300px;
+}
+.search-results-container[hidden] {
+    display: none;
+}
+#search-results-title {
+    font-size: 1rem;
+    margin-bottom: var(--spacing-s);
+    color: var(--accent-dark);
+}
+#search-results-list {
+    list-style: none;
+    padding: 0;
+    font-size: 0.9rem;
+}
+#search-results-list li {
+    margin-bottom: var(--spacing-s);
+    padding-bottom: var(--spacing-s);
+    border-bottom: 1px dashed var(--border-color);
+}
+#search-results-list li:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+#search-results-list .search-result-date {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+#close-search-results-btn {
+    position: absolute;
+    top: var(--spacing-xs);
+    right: var(--spacing-xs);
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    line-height: 1;
+}
+#close-search-results-btn:hover {
+    color: var(--text-dark);
+}
+
+/* Calendar View Container */
+.calendar-view-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Key for internal scrolling if needed */
+    position: relative; /* For loading overlay */
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent overlay */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 50;
+    transition: opacity 0.3s ease;
+}
+[data-theme="dark"] .loading-overlay {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+.loading-overlay[hidden] {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Spinner */
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-left-color: var(--spinner-color);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Weekday Header */
+.calendar-weekdays {
+    display: grid;
+    gap: 2px;
+    padding-bottom: 2px; /* Match grid gap */
+    /* Default columns for Month/Week view */
+    grid-template-columns: 40px repeat(7, 1fr); /* <-- CORRECTIF APPLIQUÉ ICI */
+}
+.calendar-weekdays div {
+    font-weight: 600;
+    text-align: center;
+    padding: var(--spacing-s) 0;
+    font-size: 0.85rem;
+    color: var(--accent-dark);
+    background-color: var(--bg-sidebar); /* Consistent with week numbers */
+    border-radius: var(--spacing-xs) var(--spacing-xs) 0 0;
+}
+
+/* Calendar Grid (Base for all views) */
+#calendar-grid {
+    flex-grow: 1;
+    display: grid;
+    gap: 2px;
+    background-color: var(--border-color);
+    border: 1px solid var(--border-color);
+    border-top: none; /* Remove double border with weekdays */
+    border-radius: 0 0 var(--spacing-xs) var(--spacing-xs);
+    overflow: auto; /* Allow scrolling if content overflows */
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+#calendar-grid[role="grid"] { /* Ensure correct role */
+    box-sizing: border-box;
+}
+
+/* Common Cell Styles */
+.week-number,
+.day-cell,
+.month-cell { /* Added month-cell for year view */
+    background-color: var(--bg-grid);
+    display: flex;
+    position: relative; /* For holiday dot, etc. */
+    transition: background-color 0.2s ease;
+    box-sizing: border-box; /* Ensure padding/border included */
+}
+
+.week-number {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-dark);
+    background-color: var(--bg-sidebar);
+    cursor: default;
+    justify-content: center;
+    align-items: center;
+    padding: var(--spacing-xs);
+}
+
+.day-cell {
+    cursor: pointer;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-end;
+    padding: var(--spacing-xs);
+    text-align: right;
+    min-height: 90px; /* Base height for month view */
+    font-size: 0.9rem;
+    gap: 2px;
+    overflow: hidden;
+}
+
+.day-number {
+    font-weight: 600;
+    font-size: 0.85em;
+    padding: 2px 4px;
+    line-height: 1;
+    border-radius: 50%;
+    min-width: 1.5em;
+    text-align: center;
+}
+
+.holiday-name-grid {
+    font-size: 0.7rem;
+    color: var(--holiday-text);
+    text-align: right;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.1;
+    margin-top: auto; /* Push to bottom */
+    padding-top: var(--spacing-xs);
+}
+
+/* Cell States */
+.day-cell:not(.other-month):not(.disabled):hover,
+.month-cell:not(.disabled):hover {
+    background-color: var(--accent-light);
+}
+
+.day-cell:not(.other-month):not(.disabled):focus-visible,
+.month-cell:not(.disabled):focus-visible {
+    outline: var(--focus-outline);
+    outline-offset: -2px;
+    z-index: 10;
+}
+
+.other-month {
+    color: var(--text-muted);
+    cursor: default;
+    background-color: var(--bg-grid-other);
+}
+.disabled { /* General disabled state */
+    color: var(--text-muted);
+    cursor: default;
+    opacity: 0.7;
+}
+
+.today .day-number {
+    background-color: var(--today-border);
+    color: var(--text-dark);
+}
+/* Add subtle border instead of full background for today */
+.today {
+   /* background-color: var(--today-bg); */ /* Removed full bg */
+   border: 1px solid var(--today-border);
+   font-weight: bold;
+}
+
+.holiday {
+    /* Base holiday styling, specific types override bg */
+    color: var(--holiday-text);
+}
+.holiday.holiday-type-Public { background-color: var(--holiday-public-bg); }
+.holiday.holiday-type-Bank { background-color: var(--holiday-bank-bg); }
+.holiday.holiday-type-Optional { background-color: var(--holiday-optional-bg); }
+.holiday.holiday-type-School { background-color: var(--holiday-optional-bg); } /* Example */
+.holiday.holiday-type-Authorities { background-color: var(--holiday-optional-bg); } /* Example */
+/* Add more types as needed */
+
+/* Holiday Dot Indicator (Optional alternative/addition) */
+/* .holiday::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    width: 6px;
+    height: 6px;
+    background-color: var(--accent-dark);
+    border-radius: 50%;
+} */
+
+.selected-day {
+    background-color: var(--selected-bg);
+    color: var(--selected-text);
+    border: 1px solid var(--selected-bg);
+}
+.selected-day .day-number {
+    background-color: transparent; /* Remove number bg when selected */
+    color: var(--selected-text);
+}
+.selected-day .holiday-name-grid {
+    color: var(--selected-text);
+}
+.selected-day.holiday {
+    /* Slightly different shade when holiday is selected */
+    filter: brightness(1.1);
+}
+/* Search Highlight */
+.search-highlight {
+    box-shadow: inset 0 0 0 2px var(--accent-medium);
+    background-color: var(--accent-light);
+}
+
+/* Month View Specific */
+.month-view {
+    grid-template-columns: 40px repeat(7, 1fr); /* wk + 7 days */
+    grid-auto-rows: minmax(90px, 1fr); /* Responsive row height */
+}
+/* .month-view .calendar-weekdays rule might be redundant now */
+
+/* Week View Specific */
+.week-view {
+    grid-template-columns: 40px repeat(7, 1fr); /* Adjust if week num not needed */
+    grid-template-rows: 1fr; /* Single row */
+    overflow-y: hidden; /* No vertical scroll needed */
+}
+/* .week-view .calendar-weekdays rule might be redundant now */
+.week-view .day-cell {
+    min-height: 400px; /* Much taller for week view */
+    align-items: stretch; /* Allow content to fill */
+    padding: var(--spacing-s);
+}
+.week-view .day-number { align-self: flex-end; }
+.week-view .holiday-name-grid { white-space: normal; } /* Allow wrap */
+
+/* Year View Specific */
+.year-view {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* 3-4 months per row */
+    grid-auto-rows: auto;
+    gap: var(--spacing-m); /* Larger gap between months */
+    padding: var(--spacing-m); /* Padding around the year grid */
+    overflow-y: auto; /* Enable scrolling for the year */
+    background-color: var(--bg-main); /* Match main background */
+    border: none; /* No border around the whole year */
+}
+.year-view .calendar-weekdays { display: none; } /* Hide main weekday header */
+.month-container {
+    border: 1px solid var(--border-color);
+    border-radius: var(--spacing-xs);
+    background-color: var(--bg-grid);
+    display: flex;
+    flex-direction: column;
+}
+.month-header-year-view {
+    font-weight: 600;
+    text-align: center;
+    padding: var(--spacing-s);
+    background-color: var(--bg-sidebar);
+    color: var(--accent-dark);
+    border-bottom: 1px solid var(--border-color);
+    border-radius: var(--spacing-xs) var(--spacing-xs) 0 0;
+}
+.mini-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background-color: var(--border-color);
+    padding: 1px; /* Inner border effect */
+}
+.mini-calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    font-size: 0.7rem;
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2px 0;
+}
+.month-cell {
+    font-size: 0.75rem;
+    min-height: 25px;
+    padding: 2px;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+.month-cell.other-month { background-color: transparent; color: var(--text-muted); }
+.month-cell.today { background-color: var(--today-bg); color: var(--text-dark); border: 1px solid var(--today-border);}
+.month-cell.holiday { background-color: var(--holiday-bg); color: var(--holiday-text); }
+.month-cell.holiday.holiday-type-Bank { background-color: var(--holiday-bank-bg); }
+.month-cell.holiday.holiday-type-Optional { background-color: var(--holiday-optional-bg); }
+.month-cell.selected-day { background-color: var(--selected-bg); color: var(--selected-text); }
+
+
+/* Error Message Styles */
+.error-message {
+    color: var(--error-text);
+    background-color: var(--error-bg);
+    border: 1px solid var(--error-border);
+    padding: var(--spacing-s) var(--spacing-m);
+    margin-bottom: var(--spacing-m);
+    border-radius: var(--spacing-xs);
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-m);
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+.error-message:empty {
+    display: none;
+}
+.retry-button {
+    padding: var(--spacing-xs) var(--spacing-s);
+    font-size: 0.8rem;
+    background-color: var(--error-text);
+    color: var(--text-light);
+    border: none;
+    border-radius: var(--spacing-xs);
+    cursor: pointer;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+.retry-button:hover {
+    opacity: 0.85;
+}
+.retry-button .retry-text { /* Hide text on smaller screens if needed */
+    display: inline;
+}
+
+.input-error-message {
+    color: var(--error-text);
+    font-size: 0.8rem;
+    margin-top: var(--spacing-xs);
+    display: block; /* Ensure it takes space */
+    min-height: 1em; /* Prevent layout shift */
+}
+.input-error-message:empty {
+    min-height: 0;
+}
+
+
+/* Print Styles */
+@media print {
+    body {
+        padding: 0;
+        background-color: #fff;
+        color: #000;
+        font-size: 10pt; /* Smaller font for print */
+        -webkit-print-color-adjust: exact !important; /* Chrome, Safari */
+        color-adjust: exact !important; /* Firefox, Edge */
+    }
+
+    .calendar-container {
+        flex-direction: column;
+        box-shadow: none;
+        border: none;
+        max-width: 100%;
+        min-height: 0;
+    }
+
+    .sidebar,
+    .calendar-header,
+    .date-jumper,
+    .search-feature,
+    .country-selector,
+    .lang-switch,
+    .theme-switcher,
+    .view-switcher,
+    .error-message,
+    .search-results-container,
+    .loading-overlay,
+    #retry-holidays-btn,
+    #retry-upcoming-btn {
+        display: none !important; /* Hide non-essential elements */
+    }
+
+    .main-content {
+        padding: 0;
+        overflow: visible;
+    }
+
+    .calendar-view-container {
+        overflow: visible;
+    }
+
+    #calendar-grid {
+        display: block; /* Change grid to block for simpler page breaks */
+        border: none;
+        background-color: transparent;
+        gap: 0;
+    }
+
+    /* Print specific styles for month view */
+    .month-view-print-header { /* Add a header for print if needed */
+        display: block;
+        text-align: center;
+        font-size: 14pt;
+        font-weight: bold;
+        margin-bottom: 10px;
+        page-break-before: always; /* Start each month on new page */
+    }
+    .month-view-print-header:first-child {
+        page-break-before: auto;
+    }
+
+    .calendar-weekdays {
+        display: grid !important; /* Ensure weekdays show */
+        grid-template-columns: 40px repeat(7, 1fr) !important; /* Explicit columns for print */
+        background-color: #eee;
+        border: 1px solid #ccc;
+    }
+    .calendar-weekdays div {
+        background-color: #eee;
+        color: #000;
+        font-size: 9pt;
+        padding: 4px 0;
+    }
+
+    #calendar-grid.month-view > div[role="row"] { /* Month view rows */
+        display: grid !important;
+        grid-template-columns: 40px repeat(7, 1fr);
+        border: 1px solid #ccc;
+        border-top: none;
+        page-break-inside: avoid; /* Try to keep rows together */
+    }
+
+    .week-number,
+    .day-cell {
+        display: flex !important;
+        border-left: 1px solid #ccc;
+        background-color: #fff !important; /* Ensure white background */
+        color: #000 !important; /* Ensure black text */
+        min-height: 60px; /* Adjust height for print */
+        padding: 4px;
+        font-size: 9pt;
+        box-shadow: none;
+        border-radius: 0;
+        overflow: hidden; /* Prevent content spilling */
+    }
+    .week-number:first-child,
+    .day-cell:first-child {
+        border-left: none;
+    }
+    .week-number {
+        background-color: #eee !important;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+    }
+    .day-cell {
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: flex-start;
+    }
+    .day-number {
+        font-weight: bold;
+        font-size: 1em;
+        padding: 0;
+        background: none !important;
+        color: #000 !important;
+        border-radius: 0;
+    }
+    .holiday-name-grid {
+        font-size: 7pt;
+        color: #333 !important;
+        white-space: normal; /* Allow wrap */
+        overflow: visible;
+    }
+
+    .other-month {
+        background-color: #f9f9f9 !important;
+        color: #aaa !important;
+    }
+    .today {
+        border: 1px solid #888 !important;
+        font-weight: bold;
+    }
+    .today .day-number {
+        text-decoration: underline;
+    }
+    .holiday {
+        background-color: #e0e0e0 !important; /* Simple grey for all holidays */
+    }
+    .selected-day {
+        box-shadow: inset 0 0 0 2px #000; /* Simple selection indicator */
+        background-color: transparent !important;
+        color: #000 !important;
+    }
+    .selected-day .day-number {
+         color: #000 !important;
+    }
+
+    /* Hide elements not relevant for other views in print */
+    .week-view, .year-view {
+        display: none !important;
+    }
+}
+
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .calendar-header {
+        gap: var(--spacing-s); /* Reduce gap */
+    }
+    .calendar-header input[type="search"] {
+        width: 120px;
+    }
+}
+
+@media (max-width: 992px) {
+    body {
+        padding: var(--spacing-s);
+    }
+    .calendar-container {
+        flex-direction: column;
+        max-width: 700px;
+        min-height: 0;
+    }
+    .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        max-height: 280px; /* Increase max-height slightly */
+    }
+    .main-content {
+        padding: var(--spacing-s);
+    }
+    .calendar-header {
+         padding-bottom: var(--spacing-s);
+         margin-bottom: var(--spacing-s);
+    }
+    #calendar-grid.month-view,
+    #calendar-grid.week-view {
+        grid-auto-rows: minmax(60px, 1fr);
+    }
+    .day-cell { min-height: 60px; }
+    .week-view .day-cell { min-height: 300px; }
+}
+
+@media (max-width: 768px) {
+    .calendar-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .calendar-header > div { /* Stack header groups */
+        width: 100%;
+        justify-content: space-between;
+    }
+    .calendar-header .controls {
+        order: 1; /* Put main nav first */
+    }
+    .calendar-header .view-switcher { order: 2; }
+    .calendar-header .date-jumper { order: 3; justify-content: flex-start; }
+    .calendar-header .search-feature { order: 4; }
+    .calendar-header .country-selector { order: 5; }
+    .calendar-header .lang-switch { order: 6; }
+    .calendar-header .theme-switcher { order: 7; }
+
+    #calendar-grid.month-view,
+    #calendar-grid.week-view {
+        grid-auto-rows: minmax(50px, 1fr);
+    }
+    .day-cell {
+        min-height: 50px;
+        font-size: 0.85rem;
+        padding: var(--spacing-xs);
+    }
+     .day-cell .holiday-name-grid {
+        display: none; /* Hide grid name on small screens */
+    }
+    /* Holiday dot becomes more important */
+    .holiday::after {
+        content: '';
+        position: absolute;
+        bottom: 3px;
+        left: 3px;
+        width: 5px;
+        height: 5px;
+        background-color: var(--accent-dark);
+        border-radius: 50%;
+        [data-theme="dark"] & {
+             background-color: var(--holiday-text);
+        }
+    }
+    .selected-day.holiday::after {
+        background-color: var(--selected-text);
+    }
+
+
+    .calendar-weekdays div:first-child, /* Hide Wk */
+     #calendar-grid .week-number {
+        display: none;
+     }
+     /* Adjust weekday columns for smaller screens where Wk is hidden */
+     .calendar-weekdays,
+     .month-view .calendar-weekdays,
+     .week-view .calendar-weekdays {
+        grid-template-columns: repeat(7, 1fr);
+     }
+
+     #calendar-grid.month-view,
+     #calendar-grid.week-view {
+        grid-template-columns: repeat(7, 1fr); /* Grid itself also needs adjustment */
+     }
+
+     .year-view { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--spacing-s);}
+     .month-cell { min-height: 20px; font-size: 0.65rem; }
+     .week-view .day-cell { min-height: 200px; }
+
+    .retry-button .retry-text {
+        display: none; /* Hide retry text */
+    }
+}
+
+@media (max-width: 480px) {
+    html { font-size: 14px; } /* Smaller base */
+    .calendar-header button,
+    .calendar-header select,
+    .calendar-header input {
+        font-size: 0.85rem;
+        padding: var(--spacing-xs) var(--spacing-s);
+        height: 34px;
+    }
+    .calendar-header input[type="number"] { width: 60px; }
+
+     #calendar-grid.month-view,
+     #calendar-grid.week-view {
+        grid-auto-rows: minmax(40px, 1fr);
+        gap: 1px;
+     }
+     #calendar-grid { gap: 1px; }
+     .day-cell {
+        min-height: 40px;
+        font-size: 0.8rem;
+     }
+     .week-view .day-cell { min-height: 150px; }
+     .year-view { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--spacing-xs);}
+
+}
