@@ -1,457 +1,432 @@
-// js/ui.js
+// js/main.js // <- Assuming this is the intended filename based on imports
 import { CONFIG, CSS_CLASSES, DOM_ELEMENTS } from './config.js';
-import { state, updateState, getCurrentLocale } from './state.js';
-import { t, i18n } from './i18n.js';
-import { formatDateYYYYMMDD, debounce } from './utils.js';
+import { state, updateState, loadState, getHolidaysFromCache, getCurrentLocale } from './state.js';
+import { t } from './i18n.js';
+import { fetchHolidays, fetchUpcomingLocalHolidays, fetchAvailableCountries } from './api.js';
+// Original imports from user upload:
 import {
-  handleMonthChange, handleYearInputChange, handleCountryChange, handleLanguageSwitch,
-  handleThemeChange, handleViewChange, handleToday, handlePrev, handleNext,
-  handleDateJumpChange, handleSearch, handleCloseSearchResults, handleRetryHolidays,
-  handleRetryUpcoming, handleRetryCountries, handleWeekStartChange // Added handlers
-} from './main.js';
-import { format } from 'date-fns'; // Use specific imports
+    populateStaticSelectors, populateCountrySelector, translateUI, applyTheme, updateNavigationLabels,
+    displayApiError, clearApiError, displayUpcomingError, clearUpcomingError,
+    displayDateJumpError, clearDateJumpError, bindEventListeners, displaySearchResults,
+    updatePrintHeader, clearCountryError
+} from './ui.js'; // Assuming these are all correctly exported from ui.js
+import { renderCalendarView, attachGridListeners } from './calendarGrid.js';
+import { updateDayInfoSidebar, displayUpcomingHolidays } from './sidebar.js';
+import { formatDateYYYYMMDD } from './utils.js';
+// Use specific imports from date-fns (as per user upload)
+import { parseISO, isValid, setDate, setMonth, getDate, endOfMonth, getYear, setYear, subWeeks, addWeeks, subMonths, addMonths, startOfWeek, isSameMonth, getMonth as getMonthFn } from 'date-fns';
 
-/**
- * Populates static selectors (Month, Year, Lang, Theme, View, Week Start).
- * Country selector is populated dynamically.
- */
-export function populateStaticSelectors() {
-  // Month Select
-  DOM_ELEMENTS.monthSelect.innerHTML = '';
-  i18n[state.currentLang].monthNames.forEach((name, index) => {
-    const option = document.createElement('option');
-    option.value = index; // 0-11
-    option.textContent = name;
-    if (index === state.currentMonth) {
-      option.selected = true;
-    }
-    DOM_ELEMENTS.monthSelect.appendChild(option);
-  });
+// --- Core Application Logic ---
 
-  // Year Input
-  DOM_ELEMENTS.yearInput.min = CONFIG.MIN_YEAR;
-  DOM_ELEMENTS.yearInput.max = CONFIG.MAX_YEAR;
-  DOM_ELEMENTS.yearInput.value = state.currentYear;
-
-  // Language Select
-  DOM_ELEMENTS.langSelect.value = state.currentLang;
-
-  // Theme Select
-  DOM_ELEMENTS.themeSelect.value = state.currentTheme;
-
-  // View Select
-  DOM_ELEMENTS.viewSelect.value = state.currentView;
-
-  // Week Start Select
-  DOM_ELEMENTS.weekStartSelect.value = state.weekStartsOn.toString(); // Value is '0' or '1'
-}
-
-/**
- * Populates the country selector dynamically.
- * @param {Array | null} countries - Array of {countryCode, name} or null if error.
- */
-export function populateCountrySelector(countries) {
-  const select = DOM_ELEMENTS.countrySelect;
-  const label = DOM_ELEMENTS.countrySelectLabel;
-  select.innerHTML = ''; // Clear existing options (including loading state)
-  DOM_ELEMENTS.retryCountriesBtn.hidden = true; // Hide retry button initially
-  label.textContent = t('selectCountry'); // Reset label
-
-  if (state.isLoadingCountries) {
-    label.textContent = t('selectCountryLoading');
-    const loadingOption = document.createElement('option');
-    loadingOption.textContent = t('selectCountryLoading');
-    loadingOption.disabled = true;
-    select.appendChild(loadingOption);
-    select.disabled = true;
-    return;
-  }
-
-  if (!countries) { // Error state
-    label.textContent = t('selectCountry'); // Keep original label
-    const errorOption = document.createElement('option');
-    errorOption.textContent = t('errorLoadingCountries').substring(0, 30) + '...'; // Short error in dropdown
-    errorOption.disabled = true;
-    select.appendChild(errorOption);
-    select.disabled = true;
-    displayCountryError(state.countriesError || t('errorLoadingCountries')); // Show full error below
-    return;
-  }
-
-  clearCountryError(); // Clear error if successful
-  select.disabled = false;
-
-  // Create options from fetched countries
-  const fragment = document.createDocumentFragment();
-  countries.forEach(country => {
-    const option = document.createElement('option');
-    option.value = country.countryCode;
-    option.textContent = country.name;
-    if (country.countryCode === state.selectedCountry) {
-      option.selected = true;
-    }
-    fragment.appendChild(option);
-  });
-  select.appendChild(fragment);
-}
-
-/**
- * Updates all UI text elements based on the current language.
- */
-export function translateUI() {
-  // Populate selectors first to get month/week start names right
-  populateStaticSelectors();
-
-  // Update country selector options if countries are loaded
-  if (state.availableCountriesCache) {
-    populateCountrySelector(state.availableCountriesCache);
-  } // If not loaded yet, populateCountrySelector will handle loading state text
-
-  // Buttons & Labels
-  document.documentElement.lang = state.currentLang; // Set HTML lang attribute
-  // SYNTAX FIX: Used template literal (backticks) for innerHTML containing HTML
-  DOM_ELEMENTS.todayBtn.innerHTML = `<i class="fas fa-calendar-day"></i> ${t('today')}`;
-  document.querySelector('label[for="date-jump"]').textContent = t('jumpTo');
-  // Country label updated in populateCountrySelector
-  document.querySelector('label[for="lang-select"]').textContent = t('selectLang');
-  document.querySelector('label[for="week-start-select"]').textContent = t('selectWeekStart');
-
-  // Search results title updated in displaySearchResults
-  DOM_ELEMENTS.holidaySearchInput.placeholder = t('searchPlaceholder');
-  DOM_ELEMENTS.searchBtn.setAttribute('aria-label', t('searchHolidays'));
-  DOM_ELEMENTS.closeSearchResultsBtn.setAttribute('aria-label', t('closeSearchResults'));
-
-  // Dynamic ARIA labels for navigation based on view
-  updateNavigationLabels();
-
-  // Static ARIA labels
-  DOM_ELEMENTS.yearInput.setAttribute('aria-label', t('selectYear'));
-  DOM_ELEMENTS.monthSelect.setAttribute('aria-label', t('selectMonth'));
-  DOM_ELEMENTS.viewSelect.setAttribute('aria-label', t('selectView'));
-  DOM_ELEMENTS.themeSelect.setAttribute('aria-label', t('selectTheme'));
-  DOM_ELEMENTS.weekStartSelect.setAttribute('aria-label', t('selectWeekStart'));
-
-  // Retry buttons text
-  // SYNTAX FIX: Used template literal (backticks) for querySelector argument
-  DOM_ELEMENTS.retryHolidaysBtn.querySelector(`.${CSS_CLASSES.errorRetryText}`).textContent = t('retry');
-  DOM_ELEMENTS.retryUpcomingBtn.querySelector(`.${CSS_CLASSES.errorRetryText}`).textContent = t('retry');
-  DOM_ELEMENTS.retryCountriesBtn.querySelector(`.${CSS_CLASSES.errorRetryText}`).textContent = t('retry');
-
-  // Select options (View/Theme/WeekStart)
-  DOM_ELEMENTS.viewSelect.querySelector('option[value="month"]').textContent = t('viewMonth');
-  DOM_ELEMENTS.viewSelect.querySelector('option[value="week"]').textContent = t('viewWeek');
-  DOM_ELEMENTS.viewSelect.querySelector('option[value="year"]').textContent = t('viewYear');
-  DOM_ELEMENTS.themeSelect.querySelector('option[value="light"]').textContent = t('themeLight');
-  DOM_ELEMENTS.themeSelect.querySelector('option[value="dark"]').textContent = t('themeDark');
-  DOM_ELEMENTS.weekStartSelect.querySelector('option[value="0"]').textContent = t('weekStartSunday');
-  DOM_ELEMENTS.weekStartSelect.querySelector('option[value="1"]').textContent = t('weekStartMonday');
-
-  // Update Weekday headers
-  updateWeekdayHeaders();
-
-  // Re-display errors if any, with current language
-  if (state.apiError) displayApiError(state.apiError);
-  if (state.upcomingError) displayUpcomingError(state.upcomingError);
-  if (state.countriesError) displayCountryError(state.countriesError);
-
-  // Update print header context
-  updatePrintHeader();
-}
-
-/**
- * Updates the aria-labels for previous/next buttons and visibility of month selector based on the current view.
- */
-export function updateNavigationLabels() {
-  let prevLabelKey, nextLabelKey;
-  switch (state.currentView) {
-    case 'week':
-      prevLabelKey = 'prevWeek';
-      nextLabelKey = 'nextWeek';
-      break;
-    case 'year':
-      prevLabelKey = 'prevYear';
-      nextLabelKey = 'nextYear';
-      break;
-    case 'month':
-    default:
-      prevLabelKey = 'prevMonth';
-      nextLabelKey = 'nextMonth';
-      break;
-  }
-  DOM_ELEMENTS.prevBtn.setAttribute('aria-label', t(prevLabelKey));
-  DOM_ELEMENTS.nextBtn.setAttribute('aria-label', t(nextLabelKey));
-
-  // Hide month selector in year/week view
-  DOM_ELEMENTS.monthSelect.style.display = (state.currentView === 'month') ? '' : 'none';
-}
-
-/**
- * Updates the weekday headers based on current language, view, and week start day.
- */
-export function updateWeekdayHeaders() {
-  const weekdaysContainer = DOM_ELEMENTS.weekdayLabelsContainer;
-  weekdaysContainer.innerHTML = ''; // Clear existing
-  weekdaysContainer.className = CSS_CLASSES.weekdaysContainer; // Reset classes
-
-  const useShortNames = state.currentView !== 'year'; // Year view uses minimal names
-  const weekdays = useShortNames ? i18n[state.currentLang].weekdaysShort : i18n[state.currentLang].weekdaysMini;
-  const firstDayOfWeek = state.weekStartsOn; // 0 for Sun, 1 for Mon
-
-  // Add "Wk" header for month/week view
-  if (state.currentView === 'month' || state.currentView === 'week') {
-    const wkHeader = document.createElement('div');
-    wkHeader.classList.add(CSS_CLASSES.weekdaysHeader);
-    wkHeader.textContent = t('week'); // Get translation for "Wk"/"Sem"/"KW"
-    weekdaysContainer.appendChild(wkHeader);
-  } else {
-    // Add modifier class for year view alignment if needed
-    // SYNTAX FIX: Used template literal (backticks) for classList.add argument
-    weekdaysContainer.classList.add(`${CSS_CLASSES.weekdaysContainer}--year-view`);
-  }
-
-  for (let i = 0; i < 7; i++) {
-    const dayIndex = (firstDayOfWeek + i) % 7;
-    const dayHeader = document.createElement('div');
-    dayHeader.classList.add(CSS_CLASSES.weekdaysHeader);
-    dayHeader.textContent = weekdays[dayIndex];
-    weekdaysContainer.appendChild(dayHeader);
-  }
-}
-
-/**
- * Updates the visual theme of the application.
- */
-export function applyTheme() {
-  // Remove existing theme classes
-  document.body.classList.remove(CSS_CLASSES.themeLight, CSS_CLASSES.themeDark);
-  // Apply the current theme class
-  const themeClass = state.currentTheme === 'dark' ? CSS_CLASSES.themeDark : CSS_CLASSES.themeLight;
-  document.body.classList.add(themeClass);
-  // Update theme selector value
-  DOM_ELEMENTS.themeSelect.value = state.currentTheme;
-}
-
-// --- Error Display Functions ---
-
-/**
- * Displays an error message in the main API error area.
- * @param {string} message - The error message.
- */
-export function displayApiError(message) {
-  DOM_ELEMENTS.apiErrorMessage.textContent = message;
-  DOM_ELEMENTS.apiErrorMessage.classList.remove(CSS_CLASSES.errorMessageHidden);
-  DOM_ELEMENTS.retryHolidaysBtn.hidden = false;
-}
-
-/** Clears the main API error message area. */
-export function clearApiError() {
-  DOM_ELEMENTS.apiErrorMessage.textContent = '';
-  DOM_ELEMENTS.apiErrorMessage.classList.add(CSS_CLASSES.errorMessageHidden);
-  DOM_ELEMENTS.retryHolidaysBtn.hidden = true;
-}
-
-/**
- * Displays an error message in the upcoming holidays error area.
- * @param {string} message - The error message.
- */
-export function displayUpcomingError(message) {
-  DOM_ELEMENTS.upcomingErrorMessage.textContent = message;
-  DOM_ELEMENTS.upcomingErrorMessage.classList.remove(CSS_CLASSES.errorMessageHidden);
-  DOM_ELEMENTS.retryUpcomingBtn.hidden = false;
-  DOM_ELEMENTS.upcomingHolidaysList.innerHTML = ''; // Clear list on error
-}
-
-/** Clears the upcoming holidays error message area. */
-export function clearUpcomingError() {
-  DOM_ELEMENTS.upcomingErrorMessage.textContent = '';
-  DOM_ELEMENTS.upcomingErrorMessage.classList.add(CSS_CLASSES.errorMessageHidden);
-  DOM_ELEMENTS.retryUpcomingBtn.hidden = true;
-}
-
-/**
- * Displays an error message related to fetching countries.
- * @param {string} message - The error message.
- */
-export function displayCountryError(message) {
-  // Display error near the country select or reuse api error message area?
-  // Let's reuse the API error message area for simplicity for now.
-  displayApiError(message); // Reuse main error display
-  DOM_ELEMENTS.retryCountriesBtn.hidden = false; // Show specific retry
-  DOM_ELEMENTS.retryHolidaysBtn.hidden = true; // Hide general retry if country fetch failed
-}
-
-/** Clears the country fetch error message area. */
-export function clearCountryError() {
-  // Only clear if the current error is specifically a country error
-  if (state.countriesError && state.apiError === state.countriesError) {
+/** Fetches holiday data for the current view and renders the main calendar grid */
+// (Keep function definition as in user upload)
+async function fetchAndRenderGrid() {
     clearApiError();
-  }
-  DOM_ELEMENTS.retryCountriesBtn.hidden = true;
+    await renderCalendarView();
+    updatePrintHeader();
 }
 
-// --- Loading State Functions ---
-
-/** Displays the loading overlay for the main calendar grid. */
-export function showLoadingOverlay() {
-  DOM_ELEMENTS.loadingOverlay.hidden = false;
+/** Fetches and updates the upcoming holidays sidebar */
+// (Keep function definition as in user upload)
+async function updateUpcomingHolidaysDisplay() {
+    clearUpcomingError();
+    const holidays = await fetchUpcomingLocalHolidays(state.selectedCountry);
+    if (holidays !== null) {
+        displayUpcomingHolidays(holidays, state.selectedCountry);
+    }
 }
 
-/** Hides the loading overlay for the main calendar grid. */
-export function hideLoadingOverlay() {
-  DOM_ELEMENTS.loadingOverlay.hidden = true;
+/** Fetches and populates the list of available countries */
+// (Keep function definition as in user upload)
+async function loadAndPopulateCountries() {
+    clearCountryError();
+    populateCountrySelector(null);
+    const countries = await fetchAvailableCountries();
+    populateCountrySelector(countries);
 }
 
-/** Displays skeleton loading state for the upcoming holidays list. */
-export function showUpcomingLoading() {
-  clearUpcomingError(); // Clear errors before showing loading
-  const list = DOM_ELEMENTS.upcomingHolidaysList;
-  list.innerHTML = ''; // Clear previous content
-  list.classList.add(CSS_CLASSES.upcomingList); // Ensure class
+// --- Event Handlers ---
 
-  // Add skeleton items
-  const fragment = document.createDocumentFragment();
-  for (let i = 0; i < 3; i++) {
-    const li = document.createElement('li');
-    li.classList.add(CSS_CLASSES.skeleton);
-    li.style.height = '45px'; // Give skeleton a height
-    fragment.appendChild(li);
-  }
-  list.appendChild(fragment);
-  // SYNTAX FIX: Removed extraneous text artifact below
-}
-
-/** Hides the loading state (called by fetch finally block). */
-export function hideUpcomingLoading() {
-  // The list will be replaced by actual content or error message,
-  // No explicit action needed here, but ensure skeletons are removed by render/error display.
-  // Could optionally find and remove skeleton items explicitly if needed.
-}
-
-/**
- * Displays an error message for the date jump input.
- * @param {string} message
- */
-export function displayDateJumpError(message) {
-  DOM_ELEMENTS.dateJumpError.textContent = message;
-  DOM_ELEMENTS.dateJumpInput.setAttribute('aria-invalid', 'true');
-}
-
-/** Clears the error message for the date jump input. */
-export function clearDateJumpError() {
-  DOM_ELEMENTS.dateJumpError.textContent = '';
-  DOM_ELEMENTS.dateJumpInput.removeAttribute('aria-invalid');
-}
-
-/**
- * Displays search results. Keeps panel open unless explicitly closed.
- * @param {Array} results - Array of { date: Date, holidayInfo: object, year: number }.
- * @param {string} query - The search query term.
- */
-export function displaySearchResults(results, query) {
-  DOM_ELEMENTS.searchResultsList.innerHTML = ''; // Clear previous results
-  DOM_ELEMENTS.searchResultsList.classList.add(CSS_CLASSES.searchResultsList);
-
-  if (results.length > 0) {
-    DOM_ELEMENTS.searchResultsTitle.textContent = t('searchResultsTitle', { query });
-    const fragment = document.createDocumentFragment();
-    const currentViewYear = state.currentYear;
-    results.forEach(result => {
-      const li = document.createElement('li');
-      li.classList.add(CSS_CLASSES.searchResultsItem);
-      // Format date, include year if different from current view year
-      const dateStr = formatDateIntl(result.date, { dateStyle: 'medium' }); // Note: formatDateIntl might not be defined
-      const yearStr = result.year !== currentViewYear ? ` (${result.year})` : '';
-
-      const name = result.holidayInfo.name; // Use original name for consistency
-      li.innerHTML = `<span class="${CSS_CLASSES.searchResultsItemDate}">${dateStr}${yearStr}</span>: ${name}`;
-      li.setAttribute('role', 'button');
-      li.tabIndex = 0; // Make focusable
-
-      const jumpToResult = () => {
-        const jumpDate = result.date;
-        // Update state to jump
-        updateState({
-          selectedDate: jumpDate,
-          currentYear: getYear(jumpDate), // Requires getYear import/definition
-          currentMonth: getMonth(jumpDate), // Requires getMonth import/definition
-          currentView: 'month' // Always switch to month view to show selection clearly
-        });
-        populateStaticSelectors(); // Update controls
-        handleViewChange(); // Trigger UI update and re-render (will also apply search highlights again)
-        // --- Keep search results open ---
-        // DOM_ELEMENTS.searchResultsContainer.classList.add(CSS_CLASSES.searchResultsHidden);
-      };
-
-      li.addEventListener('click', jumpToResult);
-      li.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          jumpToResult();
-        }
-      });
-
-      fragment.appendChild(li);
+// (Keep function definition as in user upload)
+export function handleMonthChange() {
+    const newMonth = parseInt(DOM_ELEMENTS.monthSelect.value, 10);
+    if (newMonth === state.currentMonth) return;
+    const currentFirstOfMonth = new Date(state.currentYear, state.currentMonth, 1);
+    const newDateBasis = setMonth(currentFirstOfMonth, newMonth);
+    const dayToKeep = state.selectedDate ? getDate(state.selectedDate) : 1;
+    const lastDayOfNewMonth = getDate(endOfMonth(newDateBasis));
+    const newDay = Math.min(dayToKeep, lastDayOfNewMonth);
+    const newSelectedDate = setDate(newDateBasis, newDay);
+    updateState({
+        currentMonth: newMonth,
+        selectedDate: newSelectedDate
     });
-    DOM_ELEMENTS.searchResultsList.appendChild(fragment);
-    // SYNTAX FIX: Removed extraneous text artifact below
-  } else {
-    DOM_ELEMENTS.searchResultsTitle.textContent = t('noSearchResults', { query });
-  }
-  DOM_ELEMENTS.searchResultsContainer.classList.remove(CSS_CLASSES.searchResultsHidden); // Show results
+    fetchAndRenderGrid();
+    updateDayInfoSidebar(state.selectedDate);
+}
+
+// (Keep function definition as in user upload - including missing event param if that was original)
+// Note: Logic using event.type will fail if event isn't passed by listener binding
+export async function handleYearInputChange(event) { // Assuming event *is* intended based on logic
+    const inputYear = DOM_ELEMENTS.yearInput.value.trim();
+    if (!inputYear) return;
+    const year = parseInt(inputYear, 10);
+    if (!isNaN(year) && year >= CONFIG.MIN_YEAR && year <= CONFIG.MAX_YEAR) {
+        if (year !== state.currentYear) {
+            const currentSelectedDate = state.selectedDate || state.today;
+            const newDateBasis = setYear(currentSelectedDate, year);
+            const lastDayOfNewMonth = getDate(endOfMonth(newDateBasis));
+            const newDay = Math.min(getDate(currentSelectedDate), lastDayOfNewMonth);
+            const newSelectedDate = setDate(newDateBasis, newDay);
+            updateState({
+                currentYear: year,
+                selectedDate: newSelectedDate
+            });
+            await fetchAndRenderGrid();
+            updateDayInfoSidebar(state.selectedDate);
+        }
+    } else {
+        if (event && event.type === 'change') { // Check event exists before accessing type
+            console.warn(`Invalid year input: ${inputYear}. Resetting to ${state.currentYear}`);
+            DOM_ELEMENTS.yearInput.value = state.currentYear;
+        }
+    }
+}
+
+// (Keep function definition as in user upload)
+export async function handleCountryChange() {
+    const newCountry = DOM_ELEMENTS.countrySelect.value;
+    if (newCountry === state.selectedCountry) return;
+    updateState({ selectedCountry: newCountry });
+    clearApiError();
+    clearUpcomingError();
+    await Promise.all([
+        fetchAndRenderGrid(),
+        updateUpcomingHolidaysDisplay()
+    ]);
+    updateDayInfoSidebar(state.selectedDate);
+    updatePrintHeader();
+}
+
+// (Keep function definition as in user upload)
+export async function handleLanguageSwitch() {
+    const newLang = DOM_ELEMENTS.langSelect.value;
+    if (newLang === state.currentLang) return;
+    updateState({ currentLang: newLang });
+    translateUI();
+    await fetchAndRenderGrid();
+    updateDayInfoSidebar(state.selectedDate);
+    await updateUpcomingHolidaysDisplay();
+}
+
+// (Keep function definition as in user upload)
+export function handleThemeChange() {
+    const newTheme = DOM_ELEMENTS.themeSelect.value;
+    if (newTheme === state.currentTheme) return;
+    updateState({ currentTheme: newTheme });
+    applyTheme();
+}
+
+// (Keep function definition as in user upload)
+export function handleWeekStartChange() {
+    const newWeekStart = parseInt(DOM_ELEMENTS.weekStartSelect.value, 10);
+    if (newWeekStart === state.weekStartsOn) return;
+    updateState({ weekStartsOn: newWeekStart });
+    const newCurrentWeekStart = startOfWeek(state.selectedDate || state.today, { weekStartsOn: newWeekStart });
+    updateState({ currentWeekStart: newCurrentWeekStart });
+    translateUI();
+    fetchAndRenderGrid();
+}
+
+// (Keep function definition as in user upload)
+export function handleViewChange() {
+    const newView = DOM_ELEMENTS.viewSelect.value;
+    if (newView !== state.currentView) {
+        updateState({ currentView: newView });
+        if (newView === 'week' && !state.currentWeekStart) {
+            updateState({ currentWeekStart: startOfWeek(state.selectedDate || state.today, { weekStartsOn: state.weekStartsOn }) });
+        }
+        populateStaticSelectors();
+        updateNavigationLabels();
+        fetchAndRenderGrid();
+    }
+}
+
+// (Keep function definition as in user upload)
+export function handleToday() {
+    const today = state.today;
+    const needsFullRender =
+        state.currentView !== 'month' ||
+        state.currentYear !== getYear(today) ||
+        !isSameMonth(new Date(state.currentYear, state.currentMonth, 1), today);
+    updateState({
+        selectedDate: today,
+        currentYear: getYear(today),
+        currentMonth: getMonthFn(today),
+        currentWeekStart: startOfWeek(today, { weekStartsOn: state.weekStartsOn }),
+        currentView: 'month'
+    });
+    populateStaticSelectors();
+    updateNavigationLabels();
+    if (needsFullRender) {
+        fetchAndRenderGrid();
+    } else {
+        const previousSelected = DOM_ELEMENTS.calendarGrid.querySelector(`.${CSS_CLASSES.cellSelected}`);
+        if (previousSelected) previousSelected.classList.remove(CSS_CLASSES.cellSelected);
+        const todayCell = DOM_ELEMENTS.calendarGrid.querySelector(`[data-date="${formatDateYYYYMMDD(today)}"]`);
+        if (todayCell) {
+            todayCell.classList.add(CSS_CLASSES.cellSelected);
+            todayCell.focus();
+        }
+    }
+    updateDayInfoSidebar(today);
+    handleCloseSearchResults(); // Call the function
+}
+
+// (Keep function definition as in user upload)
+export function handlePrev() {
+    let needsRender = true;
+    switch (state.currentView) {
+        case 'week':
+            const prevWeekStart = subWeeks(state.currentWeekStart, 1);
+            updateState({ currentWeekStart: prevWeekStart, currentYear: getYear(prevWeekStart) });
+            break;
+        case 'year':
+            const prevYear = state.currentYear - 1;
+            if (prevYear >= CONFIG.MIN_YEAR) {
+                updateState({ currentYear: prevYear });
+            } else needsRender = false;
+            break;
+        case 'month':
+        default:
+            const currentFirstOfMonth = new Date(state.currentYear, state.currentMonth, 1);
+            const prevMonthDate = subMonths(currentFirstOfMonth, 1);
+            updateState({
+                currentMonth: getMonthFn(prevMonthDate),
+                currentYear: getYear(prevMonthDate)
+            });
+            break;
+    }
+    if (needsRender) {
+        populateStaticSelectors();
+        fetchAndRenderGrid();
+    }
+    handleCloseSearchResults(); // Call the function
+}
+
+// (Keep function definition as in user upload)
+export function handleNext() {
+    let needsRender = true;
+    switch (state.currentView) {
+        case 'week':
+            const nextWeekStart = addWeeks(state.currentWeekStart, 1);
+            updateState({ currentWeekStart: nextWeekStart, currentYear: getYear(nextWeekStart) });
+            break;
+        case 'year':
+            const nextYear = state.currentYear + 1;
+            if (nextYear <= CONFIG.MAX_YEAR) {
+                updateState({ currentYear: nextYear });
+            } else needsRender = false;
+            break;
+        case 'month':
+        default:
+            const currentFirstOfMonth = new Date(state.currentYear, state.currentMonth, 1);
+            const nextMonthDate = addMonths(currentFirstOfMonth, 1);
+            updateState({
+                currentMonth: getMonthFn(nextMonthDate),
+                currentYear: getYear(nextMonthDate)
+            });
+            break;
+    }
+    if (needsRender) {
+        populateStaticSelectors();
+        fetchAndRenderGrid();
+    }
+    handleCloseSearchResults(); // Call the function
+}
+
+// (Keep function definition as in user upload)
+// Note: Logic using event.type will fail if event isn't passed by listener binding
+export function handleDateJumpChange(event) { // Assuming event is intended
+    const dateValue = event.target.value;
+    clearDateJumpError();
+    if (!dateValue) return;
+    try {
+        const jumpedDate = parseISO(dateValue);
+        if (!isValid(jumpedDate)) {
+            console.warn('Invalid date parsed during jump:', dateValue);
+            displayDateJumpError(t('invalidInput'));
+            return;
+        }
+        const jumpYear = getYear(jumpedDate);
+        if (jumpYear < CONFIG.MIN_YEAR || jumpYear > CONFIG.MAX_YEAR) {
+            displayDateJumpError(t('invalidDateJump', { minYear: CONFIG.MIN_YEAR, maxYear: CONFIG.MAX_YEAR }));
+            event.target.value = '';
+            return;
+        }
+        const needsRender =
+            state.currentView !== 'month' ||
+            state.currentYear !== jumpYear ||
+            state.currentMonth !== getMonthFn(jumpedDate);
+        updateState({
+            selectedDate: jumpedDate,
+            currentYear: jumpYear,
+            currentMonth: getMonthFn(jumpedDate),
+            currentWeekStart: startOfWeek(jumpedDate, { weekStartsOn: state.weekStartsOn }),
+            currentView: 'month'
+        });
+        populateStaticSelectors();
+        updateNavigationLabels();
+        if (needsRender) {
+            fetchAndRenderGrid();
+        } else {
+            const previousSelected = DOM_ELEMENTS.calendarGrid.querySelector(`.${CSS_CLASSES.cellSelected}`);
+            if (previousSelected) previousSelected.classList.remove(CSS_CLASSES.cellSelected);
+            const targetCell = DOM_ELEMENTS.calendarGrid.querySelector(`[data-date="${dateValue}"]`);
+            if (targetCell) {
+                targetCell.classList.add(CSS_CLASSES.cellSelected);
+                targetCell.focus();
+            }
+        }
+        updateDayInfoSidebar(jumpedDate);
+        handleCloseSearchResults(); // Call the function
+    } catch (error) {
+        console.error("Error processing jump date:", error);
+        displayDateJumpError('Error processing date.');
+        if(event && event.target) event.target.value = ''; // Check event/target exist
+    }
+}
+
+// (Keep function definition as in user upload)
+export async function handleSearch() {
+    const query = DOM_ELEMENTS.holidaySearchInput.value.trim().toLowerCase();
+    updateState({ searchQuery: query });
+    if (!query) {
+        updateState({ searchResults: [] });
+        DOM_ELEMENTS.searchResultsContainer.classList.add(CSS_CLASSES.searchResultsHidden);
+        clearSearchHighlights(); // This function needs to be defined/imported
+        return;
+    }
+    const currentSearchYear = state.currentYear;
+    const yearsToSearch = [currentSearchYear];
+    for (let i = 1; i <= CONFIG.SEARCH_YEAR_RANGE; i++) {
+        if (currentSearchYear - i >= CONFIG.MIN_YEAR) yearsToSearch.push(currentSearchYear - i);
+        if (currentSearchYear + i <= CONFIG.MAX_YEAR) yearsToSearch.push(currentSearchYear + i);
+    }
+    const uniqueYears = [...new Set(yearsToSearch)];
+    await Promise.all(uniqueYears.map(year => fetchHolidays(year, state.selectedCountry)))
+        .catch(fetchError => console.warn("Error fetching some years during search:", fetchError));
+    let allResults = [];
+    uniqueYears.forEach(year => {
+        const holidays = getHolidaysFromCache(state.selectedCountry, year);
+        if (!holidays) return;
+        for (const dateString in holidays) {
+            const holidayInfo = holidays[dateString];
+            const date = parseISO(dateString);
+            if (!isValid(date)) continue;
+            const name = holidayInfo.name || '';
+            if (name.toLowerCase().includes(query)) {
+                allResults.push({
+                    date: date,
+                    holidayInfo: holidayInfo,
+                    year: year
+                });
+            }
+        }
+    });
+    allResults.sort((a, b) => a.date - b.date);
+    updateState({ searchResults: allResults });
+    displaySearchResults(allResults, query);
+    applySearchHighlights(allResults); // This function needs to be defined/imported
+}
+
+/** Explicitly closes the search results panel */
+// *** CORRECTION: Added 'export' keyword ***
+export function handleCloseSearchResults() {
+    DOM_ELEMENTS.searchResultsContainer.classList.add(CSS_CLASSES.searchResultsHidden);
+    clearSearchHighlights(); // This function needs to be defined/imported
+    DOM_ELEMENTS.holidaySearchInput.value = '';
+    updateState({ searchQuery: '', searchResults: [] });
 }
 
 /**
- * Updates the hidden print header with context information.
+ * Handles click on Year View month header, switching view.
+ * @param {number} year
+ * @param {number} month
  */
-export function updatePrintHeader() {
-  if (!DOM_ELEMENTS.printHeader) return;
-  const countryName = getCountryName(DOM_ELEMENTS.countrySelect, state.selectedCountry); // Note: getCountryName might not be defined
-  let context = countryName;
-  const locale = getCurrentLocale(); // Requires getCurrentLocale import
-
-  switch (state.currentView) {
-    case 'year':
-      context += ` - ${state.currentYear}`; // Removed non-breaking space
-      break;
-    case 'week':
-      if (state.currentWeekStart && isValid(state.currentWeekStart)) { // Requires isValid import
-        const weekStartFormatted = format(state.currentWeekStart, 'PPP', { locale }); // Requires format import
-        context += ` - ${t('gridLabelWeek', { date: weekStartFormatted })}`; // Removed non-breaking space
-      } else {
-        context += ` - ${state.currentYear}`; // Removed non-breaking space // Fallback
-      }
-      break;
-    case 'month':
-    default:
-      const monthName = i18n[state.currentLang].monthNames[state.currentMonth];
-      context += ` - ${monthName} ${state.currentYear}`; // Removed non-breaking space
-      break;
-  }
-  DOM_ELEMENTS.printHeader.textContent = t('printTitle', { context });
+// (Keep function definition as in user upload)
+export function handleMonthYearChange(year, month) {
+    updateState({
+        currentView: 'month',
+        currentYear: year,
+        currentMonth: month,
+        selectedDate: new Date(year, month, 1)
+    });
+    updateState({ currentWeekStart: startOfWeek(state.selectedDate, { weekStartsOn: state.weekStartsOn }) });
+    populateStaticSelectors();
+    updateNavigationLabels();
+    fetchAndRenderGrid();
+    updateDayInfoSidebar(state.selectedDate);
 }
 
-/** Binds initial event listeners */
-export function bindEventListeners() {
-  DOM_ELEMENTS.monthSelect.addEventListener('change', handleMonthChange);
-  DOM_ELEMENTS.yearInput.addEventListener('change', handleYearInputChange);
-  DOM_ELEMENTS.yearInput.addEventListener('input', debounce(handleYearInputChange, 500)); // Handle while typing
-  DOM_ELEMENTS.countrySelect.addEventListener('change', handleCountryChange);
-  DOM_ELEMENTS.langSelect.addEventListener('change', handleLanguageSwitch);
-  DOM_ELEMENTS.themeSelect.addEventListener('change', handleThemeChange);
-  DOM_ELEMENTS.viewSelect.addEventListener('change', handleViewChange);
-  DOM_ELEMENTS.weekStartSelect.addEventListener('change', handleWeekStartChange); // Added
-  DOM_ELEMENTS.todayBtn.addEventListener('click', handleToday);
-  DOM_ELEMENTS.prevBtn.addEventListener('click', handlePrev);
-  DOM_ELEMENTS.nextBtn.addEventListener('click', handleNext);
-  DOM_ELEMENTS.dateJumpInput.addEventListener('change', handleDateJumpChange);
-  DOM_ELEMENTS.holidaySearchInput.addEventListener('search', handleSearch); // Handle clearing search via 'x'
-  DOM_ELEMENTS.holidaySearchInput.addEventListener('input', debounce(handleSearch, 350)); // Debounced search on input
-  DOM_ELEMENTS.searchBtn.addEventListener('click', handleSearch); // Explicit search button click
-  DOM_ELEMENTS.closeSearchResultsBtn.addEventListener('click', handleCloseSearchResults);
-  DOM_ELEMENTS.retryHolidaysBtn.addEventListener('click', handleRetryHolidays);
-  DOM_ELEMENTS.retryUpcomingBtn.addEventListener('click', handleRetryUpcoming);
-  DOM_ELEMENTS.retryCountriesBtn.addEventListener('click', handleRetryCountries); // Added
+// --- Retry Handlers ---
 
-  // Grid listeners attached in calendarGrid.js
-  // SYNTAX FIX: Removed extraneous text artifact below
+// (Keep function definitions as in user upload)
+export function handleRetryHolidays() {
+    fetchAndRenderGrid();
+}
+
+export function handleRetryUpcoming() {
+    updateUpcomingHolidaysDisplay();
+}
+
+export function handleRetryCountries() {
+    loadAndPopulateCountries();
+}
+
+// --- Initialization ---
+// (Keep function definition as in user upload)
+async function initializeCalendar() {
+    loadState();
+    applyTheme();
+    translateUI();
+    bindEventListeners(); // Must be imported from ui.js
+    attachGridListeners(); // Must be imported from calendarGrid.js
+    await loadAndPopulateCountries();
+    await Promise.all([
+        fetchAndRenderGrid(),
+        updateUpcomingHolidaysDisplay()
+    ]);
+    updateDayInfoSidebar(state.selectedDate);
+    updatePrintHeader();
+    console.log("Calendar Initialized. State:", state);
+}
+
+// --- Start Application ---
+initializeCalendar();
+
+// --- Helper Functions Specific to Main (Consider moving) ---
+// (Keep placeholder definitions as in user upload if they existed, or omit if not)
+// These likely belong in calendarGrid.js or utils.js and need importing
+function clearSearchHighlights() {
+    console.warn("clearSearchHighlights called in main.js but should be defined/imported");
+    const highlighted = DOM_ELEMENTS.calendarGrid.querySelectorAll(`.${CSS_CLASSES.cellSearchHighlight}`);
+    highlighted.forEach(cell => cell.classList.remove(CSS_CLASSES.cellSearchHighlight));
+}
+function applySearchHighlights(searchResults) {
+    console.warn("applySearchHighlights called in main.js but should be defined/imported");
+    clearSearchHighlights();
+    if (!searchResults || searchResults.length === 0) return;
+    const resultsMap = searchResults.reduce((map, item) => {
+       if (item && item.date && isValid(item.date)) {
+           map[formatDateYYYYMMDD(item.date)] = true;
+       }
+       return map;
+    }, {});
+    const cells = DOM_ELEMENTS.calendarGrid.querySelectorAll('[data-date]');
+    cells.forEach(cell => {
+       if (resultsMap[cell.dataset.date]) {
+           cell.classList.add(CSS_CLASSES.cellSearchHighlight);
+       }
+    });
 }
