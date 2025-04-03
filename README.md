@@ -1,121 +1,115 @@
-# Interactive Calendar Application
+# Interactive Holiday Calendar
+
+An interactive web-based calendar application that displays public holidays for various countries, featuring multiple views, customization options, and holiday details.
 
 ## Description
 
-This is a feature-rich interactive calendar web application built with vanilla JavaScript, HTML, and CSS. It allows users to view dates, navigate between months, weeks, and years, display public holidays for various countries, search for holidays, and customize the view with different themes and languages.
+This application allows users to browse public holidays across different countries and years. It provides month, week, and year views, along with detailed information about selected dates and upcoming holidays. The calendar supports multiple languages, themes, and configurable week start days. Holiday data is fetched from the Nager.Date API and cached for performance.
 
 ## Features
 
-* **Multiple Calendar Views:** Switch between Month, Week, and Year views.
-* **Holiday Data:** Fetches and displays public holidays using the Nager.Date API.
-    * Shows holiday names, types (Public, Bank, Optional etc.), scope (National/Regional), and launch year (if available).
-    * Provides an "Upcoming Holidays" list for the selected country.
-    * Includes links to search for holiday details online.
-* **Navigation:**
-    * Navigate by month, week (depending on view), and year.
-    * Directly jump to a specific date.
-    * Quick "Today" button.
-* **Customization:**
-    * Select the country for holiday display from over 100 options.
-    * Choose the interface language (English, French, German supported).
-    * Switch between Light and Dark themes.
-* **Search:** Find holidays within the currently displayed year by name.
-* **Accessibility:**
-    * Keyboard navigation support for the calendar grid.
-    * ARIA attributes for improved screen reader compatibility.
-    * Focus indicators for interactive elements.
-    * Consideration for color contrast (WCAG AA target).
-* **Performance:**
-    * API Caching: Utilizes both in-memory and `localStorage` caching (with expiry) to minimize API calls.
-    * Optimized Rendering: Updates date selection without full grid re-renders. Uses `DocumentFragment` for efficient list/grid generation.
-* **Responsive Design:** Adapts layout for different screen sizes (desktop, tablet, mobile).
-* **Print Functionality:** Basic print styles included to print the Month view reasonably.
-* **Modular Code:** JavaScript code is organized into ES modules for better maintainability.
-* **Modern Date Handling:** Uses the `date-fns` library for reliable date operations.
+*   **Multiple Calendar Views:**
+    *   **Month View:** Classic monthly grid layout with week numbers.
+    *   **Week View:** Detailed 7-day layout with subtle time-slot hints.
+    *   **Year View:** Overview of the entire year with mini-calendars for each month (lazy-loaded using IntersectionObserver).
+*   **Holiday Data:**
+    *   Displays public, bank, and optional holidays fetched from the Nager.Date API.
+    *   Shows holiday name, type, scope (national/regional), and observed year (if available).
+    *   Displays list of applicable regions/counties for regional holidays.
+    *   Upcoming holidays list in the sidebar.
+*   **Internationalization (i18n):**
+    *   Supports multiple languages (English, French, German implemented).
+    *   UI elements, dates, and known holiday names are translated.
+*   **Customization:**
+    *   **Country Selection:** Dynamically loaded list of available countries.
+    *   **Theme:** Light and Dark themes available.
+    *   **Week Start:** User can configure the week to start on Sunday or Monday.
+*   **Interactivity:**
+    *   Click or use keyboard navigation (arrows, Enter/Space) to select dates.
+    *   Navigate between periods (month/week/year) using previous/next buttons.
+    *   Jump directly to a specific date using the date picker.
+    *   "Today" button jumps to the current date in Month view.
+    *   Clicking a month header in Year view switches to Month view for that month.
+*   **Search:**
+    *   Search for holidays by name within the current year and +/- configurable range (default 1 year).
+    *   Highlights search results on the calendar grid.
+    *   Search results panel lists matching holidays.
+*   **Sidebar:**
+    *   Displays detailed information for the selected date, including holiday details and external search link.
+    *   Shows a list of upcoming holidays for the selected country.
+*   **Performance:**
+    *   In-memory and localStorage caching for holiday data and country lists to minimize API calls.
+    *   Lazy loading of mini-calendars in Year view using IntersectionObserver.
+*   **Accessibility:**
+    *   Semantic HTML structure.
+    *   ARIA attributes for grid roles, labels, and states.
+    *   Keyboard navigation support for grid cells and year view month headers.
+    *   Focus management.
+    *   (Conceptual) Color contrast audit points added.
+*   **Print Styles:**
+    *   Optimized print layout for Month view.
+    *   Basic print layouts for Week and Year views.
+    *   Includes context (Country, Period) in the print header.
+
+## Demo / Screenshot
+
+*(Placeholder: Add a link to a live demo or insert screenshots/GIFs here)*
 
 ## Technologies Used
 
-* **HTML5:** Structure of the application.
-* **CSS3:** Styling, layout (Grid), themes, responsiveness, print styles.
-    * CSS Variables for theming and consistency.
-* **JavaScript (ES6+ Modules):** Application logic, DOM manipulation, API interaction, event handling.
-* **date-fns:** JavaScript date utility library (loaded via CDN).
-* **Nager.Date API:** External API for fetching public holiday data ([https://date.nager.at/Api](https://date.nager.at/Api)).
+*   **Frontend:** HTML5, CSS3, JavaScript (ES Modules)
+*   **Libraries:**
+    *   [date-fns](https://date-fns.org/): For robust date manipulation and formatting.
+*   **API:** [Nager.Date API](https://date.nager.at/): Source for public holiday data.
+*   **Icons:** Font Awesome
 
-## Setup & Installation
+## Setup and Installation
 
-1.  **Download Files:** Place all the generated files (`index.html`, `style.css`, and the `js/` folder containing all `.js` modules) in a single project directory.
-2.  **Run a Local Server:** Because the project uses JavaScript ES Modules, you cannot simply open `index.html` directly in the browser using the `file:///` protocol. You need to serve the files using a local web server.
-    * **Using Node.js/npm:** If you have Node.js installed, you can use simple packages like `http-server`:
-        ```bash
-        # Install globally (if you haven't already)
-        npm install -g http-server
+1.  **Clone the repository:**
+    ```bash
+    git clone <your-repository-url>
+    cd <repository-directory>
+    ```
+2.  **Install Dependencies:** This project uses `date-fns`. It's assumed a build process (like Webpack, Rollup, Parcel, etc.) is used to bundle modules. If running without a build step, you would need to revert to using the CDN version of `date-fns` included in the HTML.
+    ```bash
+    # Example using npm (if you set up a package.json)
+    npm install
+    # Or yarn install
+    ```
+3.  **Build Step (Conceptual):** Run your build process if you have one configured.
+    ```bash
+    # Example using npm (if configured in package.json)
+    npm run build
+    ```
+4.  **Run Locally:** Open the `index.html` file in your browser. A local web server is recommended for handling ES Modules correctly. You can use extensions like "Live Server" for VS Code or run a simple server:
+    ```bash
+    # Example using Python's built-in server (from the project root)
+    python -m http.server
+    # Or using Node.js 'serve' package
+    # npm install -g serve
+    # serve .
+    ```
+    Then navigate to `http://localhost:<port>` (e.g., `http://localhost:8000`).
 
-        # Navigate to your project directory in the terminal
-        cd /path/to/your/calendar-project
+## Configuration
 
-        # Start the server
-        http-server
-        ```
-        Then open your browser and go to the URL provided (usually `http://localhost:8080`).
-    * **Using Python:** If you have Python installed:
-        ```bash
-        # Navigate to your project directory in the terminal
-        cd /path/to/your/calendar-project
+Key configuration options can be found and modified in `js/config.js`:
 
-        # For Python 3
-        python -m http.server
+*   `API_BASE_URL`: Base URL for the Nager.Date API.
+*   `DEFAULT_COUNTRY`, `DEFAULT_LANG`, `DEFAULT_THEME`, `DEFAULT_VIEW`, `DEFAULT_WEEK_START`: Default settings on first load.
+*   `CACHE_EXPIRY_MS`, `COUNTRY_CACHE_EXPIRY_MS`: Cache durations.
+*   `MAX_REGIONAL_DISPLAY`: Max number of regions shown in the sidebar before truncating.
+*   `SEARCH_YEAR_RANGE`: Number of years +/- the current year to include in holiday search.
 
-        # For Python 2
-        python -m SimpleHTTPServer
-        ```
-        Then open your browser and go to `http://localhost:8000`.
-    * **Using VS Code Live Server:** If using Visual Studio Code, you can install the "Live Server" extension and click "Go Live" from the status bar.
+## API Source
 
-## Usage
+This project relies on the free [Nager.Date Public Holiday API](https://date.nager.at/) for retrieving holiday information. Please respect their terms of use.
 
-* **Navigate:** Use the arrow buttons (<<, <, >, >>) or the Month/Year selectors to change the displayed period. The behavior of arrows changes based on the selected View (Month, Week, Year).
-* **Select Date:** Click on a day in the calendar grid to select it and view details in the left sidebar.
-* **Jump to Date:** Use the "Jump to:" date input to go directly to a specific date.
-* **Change Country/Language/Theme/View:** Use the respective dropdown selectors in the header. Settings (except date jump) are saved locally.
-* **Search Holidays:** Type a holiday name in the search box and press Enter or click the search icon. Results for the current year will appear below the header. Click a result to jump to its date (in Month view).
-* **Keyboard Navigation:** Use Tab to move between controls. Use Arrow keys to navigate within the calendar grid when a date cell has focus. Press Enter or Space to select the focused date.
+## Contributing
 
-## File Structure
-
-* `.`
-    * `index.html`        # Main HTML structure
-    * `style.css`         # CSS styles
-    * `js/`               # JavaScript modules folder
-        * `api.js`        # API interaction logic (fetching holidays)
-        * `calendarGrid.js` # Logic for rendering calendar grids (month, week, year)
-        * `config.js`     # Configuration constants, CSS classes, DOM elements mapping
-        * `i18n.js`       # Internationalization strings and translation functions
-        * `main.js`       # Main application entry point, event handlers, initialization
-        * `sidebar.js`    # Logic for updating the sidebars (day info, upcoming)
-        * `state.js`      # Centralized application state management
-        * `ui.js`         # UI update functions (selectors, text, theme, errors, loading)
-        * `utils.js`      # Utility functions (date formatting, debounce, etc.)
-
-
-## API Used
-
-This project relies on the free **Nager.Date API** to fetch public holiday information for various countries.
-
-* **Website:** [https://date.nager.at/Api](https://date.nager.at/Api)
-* No API key is required for basic usage as implemented here.
-
-## Potential Future Improvements
-
-* Add event creation/display capabilities.
-* Integrate different holiday types more distinctively (e.g., religious, local observances).
-* More sophisticated year/week view layouts.
-* Implement multi-year search.
-* Add build process (e.g., using Vite, Webpack) for bundling and optimization.
-* Refactor CSS potentially using SASS/SCSS.
-* Add unit/integration tests.
-* Use a more robust i18n library (like i18next) for complex translation needs.
+Contributions are welcome! Please feel free to submit issues or pull requests.
+*(Optional: Add more specific contribution guidelines)*
 
 ## License
 
-(Optional: Add license information here, e.g., MIT License)
+*(Optional: Specify the license for your project, e.g., MIT License)*
