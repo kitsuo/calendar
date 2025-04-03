@@ -25,15 +25,15 @@ export function getWeekNumber(date) {
 
 /**
  * Gets the display name of a country from the select dropdown.
- * @param {HTMLSelectElement} countrySelectElement - The country select dropdown.
+ * @param {HTMLSelectElement | null} countrySelectElement - The country select dropdown.
  * @param {string} countryCode - The country code (e.g., 'FR').
- * @returns {string} The country name or the code if not found.
+ * @returns {string} The country name or the code if not found or element is missing.
  */
 export function getCountryName(countrySelectElement, countryCode) {
-  if (!countrySelectElement) return countryCode;
-  // SYNTAX FIX: Used template literal (backticks) for querySelector argument
+  // Added check for null element
+  if (!countrySelectElement || !countryCode) return countryCode || '';
   const option = countrySelectElement.querySelector(`option[value="${countryCode}"]`);
-  return option ? option.textContent : countryCode;
+  return option ? option.textContent || countryCode : countryCode; // Added fallback for empty textContent
 }
 
 /**
@@ -46,9 +46,10 @@ export function debounce(func, wait) {
   // TODO: Add unit tests for debouncing.
   let timeout;
   return function executedFunction(...args) {
+    const context = this; // Capture context
     const later = () => {
-      clearTimeout(timeout);
-      func.apply(this, args);
+      timeout = null; // Clear timeout ID before calling func
+      func.apply(context, args);
     };
     clearTimeout(timeout);
     timeout = setTimeout(later, wait);
@@ -58,16 +59,25 @@ export function debounce(func, wait) {
 /**
  * Creates a DocumentFragment from an array of items.
  * Efficiently builds DOM structure before appending.
+ * @template T
  * @param {Array<T>} items - The array of items to process.
- * @param {function(item: T, index: number): HTMLElement | null} createNodeFn - Function to create an HTML element for each item.
+ * @param {function(item: T, index: number): Node | null} createNodeFn - Function to create a DOM Node for each item.
  * @returns {DocumentFragment}
  */
 export function createDocumentFragment(items, createNodeFn) {
   const fragment = document.createDocumentFragment();
+  if (!items) return fragment; // Handle null/undefined items array
+
   items.forEach((item, index) => {
-    const node = createNodeFn(item, index);
-    if (node instanceof Node) { // Check if it's a valid node
-      fragment.appendChild(node);
+    try { // Add try-catch around node creation
+        const node = createNodeFn(item, index);
+        if (node instanceof Node) { // Check if it's a valid node
+          fragment.appendChild(node);
+        } else if (node !== null) {
+            console.warn("createNodeFn did not return a DOM Node or null for item:", item);
+        }
+    } catch(e) {
+        console.error("Error in createNodeFn for item:", item, e);
     }
   });
   return fragment;
@@ -81,9 +91,10 @@ export function createDocumentFragment(items, createNodeFn) {
 export function safeLocalStorageGetItem(key) {
   // TODO: Add unit tests for localStorage interactions.
   try {
+    // Check if localStorage is actually available (e.g., not in private Browse in some older browsers)
+    if (typeof localStorage === 'undefined') return null;
     return localStorage.getItem(key);
   } catch (e) {
-    // SYNTAX FIX: Used template literal (backticks) for console.error argument
     console.error(`LocalStorage Read Error (${key}):`, e);
     return null;
   }
@@ -97,9 +108,9 @@ export function safeLocalStorageGetItem(key) {
 export function safeLocalStorageSetItem(key, value) {
   // TODO: Add unit tests for localStorage interactions.
   try {
+    if (typeof localStorage === 'undefined') return;
     localStorage.setItem(key, value);
   } catch (e) {
-    // SYNTAX FIX: Used template literal (backticks) for console.error argument
     console.error(`LocalStorage Write Error (${key}):`, e);
   }
 }
@@ -111,9 +122,9 @@ export function safeLocalStorageSetItem(key, value) {
 export function safeLocalStorageRemoveItem(key) {
   // TODO: Add unit tests for localStorage interactions.
   try {
+    if (typeof localStorage === 'undefined') return;
     localStorage.removeItem(key);
   } catch (e) {
-    // SYNTAX FIX: Used template literal (backticks) for console.error argument
     console.error(`LocalStorage Remove Error (${key}):`, e);
   }
 }

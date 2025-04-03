@@ -1,6 +1,8 @@
 // js/i18n.js
 import { state, getCurrentLocale } from './state.js';
 import { format } from 'date-fns'; // Use specific imports
+// Import locales needed by getCurrentLocale fallback if separate files
+import { enUS } from 'date-fns/locale';
 
 // --- Internationalization (i18n) ---
 
@@ -10,19 +12,19 @@ export const i18n = {
     monthNamesShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     weekdays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
     weekdaysShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-    weekdaysMini: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'], // For year view
-    week: 'Wk', // Abbreviation for Week
+    weekdaysMini: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+    week: 'Wk',
     noDaySelected: 'Select a day',
     today: 'Today',
     publicHoliday: 'Public Holiday',
     bankHoliday: 'Bank Holiday',
-    optionalHoliday: 'Optional Holiday', // Generic term
+    optionalHoliday: 'Optional Holiday',
     holidayType: 'Holiday ({type})',
     scope: 'Scope',
     national: 'National',
     regional: 'Regional',
-    regions: 'Regions', // Label for list of regions
-    regionsMore: '+ {count} more', // Truncation indicator
+    regions: 'Regions',
+    regionsMore: '+ {count} more',
     observedSince: 'Observed since',
     noInfo: 'No details available',
     searchLink: 'Search online',
@@ -40,12 +42,12 @@ export const i18n = {
     selectMonth: 'Select Month',
     selectView: 'Select View',
     selectTheme: 'Select Theme',
-    selectWeekStart: 'Week Starts:', // Label for week start dropdown
+    selectWeekStart: 'Week Starts:',
     weekStartSunday: 'Sunday',
     weekStartMonday: 'Monday',
-    prevPeriod: 'Previous Period', // Generic label
-    nextPeriod: 'Next Period', // Generic label
-    prevMonth: 'Previous Month', // Specific for ARIA if needed
+    prevPeriod: 'Previous Period',
+    nextPeriod: 'Next Period',
+    prevMonth: 'Previous Month',
     nextMonth: 'Next Month',
     prevWeek: 'Previous Week',
     nextWeek: 'Next Week',
@@ -54,10 +56,11 @@ export const i18n = {
     gridLabelMonth: 'Calendar for {month} {year}',
     gridLabelWeek: 'Calendar for week starting {date}',
     gridLabelYear: 'Calendar for {year}',
-    gridLabelYearMonth: '{month} {year}', // ARIA label for month in year view
+    gridLabelYearMonth: '{month} {year}',
     weekLabel: 'Week {weekNum}',
     selected: 'Selected',
-    weekend: 'Weekend', // Added for weekend ARIA label
+    weekend: 'Weekend',
+    invalidInput: 'Invalid input', // Added for generic date jump error
     invalidDateJump: 'Invalid date selected. Please choose a date between {minYear} and {maxYear}.',
     searchHolidays: 'Search Holidays',
     searchPlaceholder: 'Search holidays...',
@@ -69,7 +72,7 @@ export const i18n = {
     viewYear: 'Year',
     themeLight: 'Light',
     themeDark: 'Dark',
-    printTitle: 'Calendar: {context}', // Context: e.g., France - August 2024, France - Week of Aug 18, 2024, France - 2024
+    printTitle: 'Calendar: {context}',
   },
   fr: {
     monthNames: ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'],
@@ -77,9 +80,9 @@ export const i18n = {
     weekdays: ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
     weekdaysShort: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
     weekdaysMini: ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa'],
-    week: 'Sem', // Abbreviation for Week
+    week: 'Sem',
     noDaySelected: 'Sélectionnez un jour',
-    today: 'Aujourd\'hui', // Corrected apostrophe
+    today: 'Aujourd\'hui',
     publicHoliday: 'Jour Férié Public',
     bankHoliday: 'Férié Bancaire',
     optionalHoliday: 'Férié Optionnel',
@@ -124,6 +127,7 @@ export const i18n = {
     weekLabel: 'Semaine {weekNum}',
     selected: 'Sélectionné',
     weekend: 'Weekend',
+    invalidInput: 'Saisie invalide', // Added
     invalidDateJump: 'Date sélectionnée invalide. Veuillez choisir une date entre {minYear} et {maxYear}.',
     searchHolidays: 'Rechercher Fériés',
     searchPlaceholder: 'Rechercher fériés...',
@@ -143,7 +147,7 @@ export const i18n = {
     weekdays: ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'],
     weekdaysShort: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'],
     weekdaysMini: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'],
-    week: 'KW', // Kalenderwoche
+    week: 'KW',
     noDaySelected: 'Wähle einen Tag',
     today: 'Heute',
     publicHoliday: 'Gesetzlicher Feiertag',
@@ -190,6 +194,7 @@ export const i18n = {
     weekLabel: 'Woche {weekNum}',
     selected: 'Ausgewählt',
     weekend: 'Wochenende',
+    invalidInput: 'Ungültige Eingabe', // Added
     invalidDateJump: 'Ungültiges Datum ausgewählt. Bitte wählen Sie ein Datum zwischen {minYear} und {maxYear}.',
     searchHolidays: 'Feiertage suchen',
     searchPlaceholder: 'Feiertage suchen...',
@@ -206,36 +211,34 @@ export const i18n = {
 };
 
 // --- Holiday Name Translations ---
-// Structure: 'KEY': { en: 'English Name', fr: 'French Name', de: 'German Name' }
 const holidayNameTranslations = {
-  '01-01': { en: 'New Year\'s Day', fr: 'Jour de l\'an', de: 'Neujahrstag' }, // Corrected apostrophes
+  '01-01': { en: 'New Year\'s Day', fr: 'Jour de l\'an', de: 'Neujahrstag' },
   'EASTER': { en: 'Easter Sunday', fr: 'Pâques', de: 'Ostersonntag' },
   'GOOD_FRIDAY': { en: 'Good Friday', fr: 'Vendredi Saint', de: 'Karfreitag' },
   'EASTER_MONDAY': { en: 'Easter Monday', fr: 'Lundi de Pâques', de: 'Ostermontag' },
   '05-01': { en: 'Labour Day', fr: 'Fête du Travail', de: 'Tag der Arbeit' },
-  '05-08': { en: 'Victory in Europe Day', fr: 'Victoire 1945', de: 'Tag des Sieges' }, // Primarily FR/DE relevant
+  '05-08': { en: 'Victory in Europe Day', fr: 'Victoire 1945', de: 'Tag des Sieges' },
   'ASCENSION': { en: 'Ascension Day', fr: 'Ascension', de: 'Christi Himmelfahrt' },
   'PENTECOST': { en: 'Pentecost Sunday', fr: 'Pentecôte', de: 'Pfingstsonntag' },
   'PENTECOST_MONDAY': { en: 'Whit Monday', fr: 'Lundi de Pentecôte', de: 'Pfingstmontag' },
-  'CORPUS_CHRISTI': { en: 'Corpus Christi', fr: 'Fête-Dieu', de: 'Fronleichnam' }, // Common in DE/AT/CH/PL etc.
-  '07-14': { en: 'Bastille Day', fr: 'Fête Nationale', de: 'Französischer Nationalfeiertag' }, // Primarily FR
-  '08-01': { en: 'Swiss National Day', fr: 'Fête Nationale Suisse', de: 'Schweizer Nationalfeiertag' }, // CH
+  'CORPUS_CHRISTI': { en: 'Corpus Christi', fr: 'Fête-Dieu', de: 'Fronleichnam' },
+  '07-14': { en: 'Bastille Day', fr: 'Fête Nationale', de: 'Französischer Nationalfeiertag' },
+  '08-01': { en: 'Swiss National Day', fr: 'Fête Nationale Suisse', de: 'Schweizer Nationalfeiertag' },
   '08-15': { en: 'Assumption Day', fr: 'Assomption', de: 'Mariä Himmelfahrt' },
-  '10-03': { en: 'German Unity Day', fr: 'Jour de l\'Unité Allemande', de: 'Tag der Deutschen Einheit' }, // DE - Corrected apostrophe
+  '10-03': { en: 'German Unity Day', fr: 'Jour de l\'Unité Allemande', de: 'Tag der Deutschen Einheit' },
   '10-26': { en: 'National Day', fr: 'Fête Nationale', de: 'Nationalfeiertag' }, // AT
-  '11-01': { en: 'All Saints\' Day', fr: 'Toussaint', de: 'Allerheiligen' }, // Corrected apostrophe
-  '11-11': { en: 'Armistice Day', fr: 'Armistice 1918', de: 'Waffenstillstandstag' }, // Primarily FR/BE
+  '11-01': { en: 'All Saints\' Day', fr: 'Toussaint', de: 'Allerheiligen' },
+  '11-11': { en: 'Armistice Day', fr: 'Armistice 1918', de: 'Waffenstillstandstag' },
   '12-25': { en: 'Christmas Day', fr: 'Noël', de: 'Erster Weihnachtstag' },
-  '12-26': { en: 'St Stephen\'s Day / Boxing Day', fr: 'Lendemain de Noël (St Étienne)', de: 'Zweiter Weihnachtstag' } // Corrected apostrophe
+  '12-26': { en: 'St Stephen\'s Day / Boxing Day', fr: 'Lendemain de Noël (St Étienne)', de: 'Zweiter Weihnachtstag' }
 };
 
-// Map common English names (lowercase) from API to translation keys
 const knownVariableHolidayNames = {
   'easter sunday': 'EASTER',
   'good friday': 'GOOD_FRIDAY',
   'easter monday': 'EASTER_MONDAY',
   'ascension day': 'ASCENSION',
-  'whit sunday': 'PENTECOST', // Alias
+  'whit sunday': 'PENTECOST',
   'pentecost': 'PENTECOST',
   'whit monday': 'PENTECOST_MONDAY',
   'pentecost monday': 'PENTECOST_MONDAY',
@@ -249,37 +252,31 @@ const knownVariableHolidayNames = {
  * @returns {string} Translated name or the original API name.
  */
 export function getTranslatedHolidayName(holidayDateString, apiName) {
-  // TODO: Add unit tests for holiday name translation logic.
   if (!apiName) return '';
-
   const lowerApiName = apiName.toLowerCase();
   let key = null;
 
-  // 1. Check known variable names
   for (const name in knownVariableHolidayNames) {
+    // Use includes for partial matches if API names vary slightly
     if (lowerApiName.includes(name)) {
       key = knownVariableHolidayNames[name];
       break;
     }
   }
 
-  // 2. Check fixed date MM-DD if no variable match
   if (!key && holidayDateString && holidayDateString.length === 10) {
-    const monthDay = holidayDateString.substring(5); // 'MM-DD'
+    const monthDay = holidayDateString.substring(5);
     if (holidayNameTranslations.hasOwnProperty(monthDay)) {
       key = monthDay;
     }
   }
 
-  // 3. Use the key to get translation
   if (key) {
     const translations = holidayNameTranslations[key];
-    if (translations && translations[state.currentLang]) {
-      return translations[state.currentLang];
-    }
+    // Use optional chaining for safer access
+    return translations?.[state.currentLang] ?? apiName; // Fallback to apiName if key or lang not found
   }
 
-  // 4. Fallback to original API name
   return apiName;
 }
 
@@ -290,13 +287,13 @@ export function getTranslatedHolidayName(holidayDateString, apiName) {
  * @returns {string} The translated string or the key if not found.
  */
 export function t(key, replacements = {}) {
-  // TODO: Add unit tests for translation fallback and replacement logic.
-  let translation = i18n[state.currentLang]?.[key] || i18n['en']?.[key] || key;
+  let translation = i18n[state.currentLang]?.[key] ?? i18n['en']?.[key] ?? key; // Use nullish coalescing
 
+  // Basic replacement, consider more robust library for complex cases
   for (const placeholder in replacements) {
-    // SYNTAX FIX: Corrected arguments for replace. Using template literal for the search string.
-    // This replaces the first occurrence. For global replace, use RegExp: new RegExp(`\\{${placeholder}\\}`, 'g')
-    translation = translation.replace(`{${placeholder}}`, replacements[placeholder]);
+    // Use RegExp for global replacement, escaping placeholder for safety
+    const regex = new RegExp(`\\{${placeholder}\\}`, 'g');
+    translation = translation.replace(regex, replacements[placeholder]);
   }
   return translation;
 }
@@ -307,21 +304,20 @@ export function t(key, replacements = {}) {
  * @returns {string} The translated type or the original type.
  */
 export function translateHolidayType(apiType) {
-  // TODO: Add unit tests for holiday type translation.
   if (!apiType) return '';
-
   const lowerType = apiType.toLowerCase();
   switch (lowerType) {
     case 'public': return t('publicHoliday');
     case 'bank': return t('bankHoliday');
     case 'optional': return t('optionalHoliday');
     // Add cases for other known types like 'school', 'authorities' if needed
-    default: return apiType; // Fallback to original if not specifically translated
+    default: return apiType;
   }
 }
 
 /**
  * Formats a date using Intl.DateTimeFormat based on current language and options.
+ * ADDED EXPORT as it's used in other modules.
  * @param {Date} date The date to format.
  * @param {Intl.DateTimeFormatOptions} options Formatting options.
  * @returns {string} Formatted date string.
@@ -329,16 +325,22 @@ export function translateHolidayType(apiType) {
 export function formatDateIntl(date, options) {
   // TODO: Add unit tests for date formatting.
   try {
-    // Ensure state.currentLang is a valid locale string for Intl
-    const validLocale = state.currentLang || 'en'; // Fallback to 'en'
-    return new Intl.DateTimeFormat(validLocale, options).format(date);
+    const validLocale = state.currentLang || 'en';
+    // Ensure the locale exists in Intl before using it
+    const supported = Intl.DateTimeFormat.supportedLocalesOf([validLocale]);
+    const localeToUse = supported.length > 0 ? supported[0] : 'en'; // Fallback to 'en'
+    return new Intl.DateTimeFormat(localeToUse, options).format(date);
   } catch (e) {
     console.warn("Intl.DateTimeFormat error, falling back to date-fns format:", e);
-    // Fallback using date-fns default formatting for the locale
-    const locale = getCurrentLocale(); // Assumes getCurrentLocale returns a date-fns locale object
-    let formatString = 'PPP'; // Default long date format
+    const locale = getCurrentLocale() || enUS; // Ensure locale is imported/available
+    let formatString = 'PPP';
     if (options.dateStyle === 'medium') formatString = 'PP';
     if (options.dateStyle === 'short') formatString = 'P';
-    return format(date, formatString, { locale });
+    try { // Add try-catch for date-fns format as well
+        return format(date, formatString, { locale });
+    } catch (formatError) {
+        console.error("date-fns format error after Intl fallback:", formatError);
+        return date.toDateString(); // Absolute fallback
+    }
   }
 }

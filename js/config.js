@@ -30,17 +30,6 @@ export const DATE_FNS_LOCALES = {
 };
 
 // CSS Classes (moving towards BEM, prefix 'cal-' for clarity)
-// Block: cal-calendar
-// Block: cal-sidebar
-// Block: cal-main
-// Block: cal-header
-// Block: cal-grid
-// Block: cal-day-info
-// Block: cal-upcoming
-// Block: cal-search-results
-// Block: cal-error
-// Block: cal-loader
-// Block: cal-weekdays
 export const CSS_CLASSES = {
   // General & Layout
   calendarContainer: 'cal-container',
@@ -60,7 +49,7 @@ export const CSS_CLASSES = {
   headerInputError: 'cal-header__input-error', // For date jump error
 
   // Weekdays
-  weekdaysContainer: 'cal-weekdays',
+  weekdaysContainer: 'cal-weekdays', // Used for querySelector
   weekdaysHeader: 'cal-weekdays__header',
 
   // Grid & Cells
@@ -128,13 +117,10 @@ export const CSS_CLASSES = {
   // Theme Modifiers (Applied to body or container)
   themeLight: 'theme--light',
   themeDark: 'theme--dark',
-  // SYNTAX FIX: Removed extraneous text artifact below
 };
 
-// DOM Element references (remain mostly the same, but use new class constants if needed for selection robustness)
-// Consider querying within specific blocks if IDs aren't unique enough (though they are here)
+// DOM Element references
 export const DOM_ELEMENTS = {
-  // SYNTAX FIX: Used template literal (backticks) for querySelector argument
   calendarContainer: document.querySelector(`.${CSS_CLASSES.calendarContainer}`), // Use class
 
   // Header
@@ -144,7 +130,7 @@ export const DOM_ELEMENTS = {
   langSelect: document.getElementById('lang-select'),
   themeSelect: document.getElementById('theme-select'),
   viewSelect: document.getElementById('view-select'),
-  weekStartSelect: document.getElementById('week-start-select'), // Added
+  weekStartSelect: document.getElementById('week-start-select'),
   todayBtn: document.getElementById('today-btn'),
   prevBtn: document.getElementById('prev-btn'),
   nextBtn: document.getElementById('next-btn'),
@@ -152,35 +138,30 @@ export const DOM_ELEMENTS = {
   dateJumpError: document.getElementById('date-jump-error'),
   holidaySearchInput: document.getElementById('holiday-search'),
   searchBtn: document.getElementById('search-btn'),
-  searchResultsContainer: document.getElementById('search-results-container'), // Use ID
+  searchResultsContainer: document.getElementById('search-results-container'),
   searchResultsList: document.getElementById('search-results-list'),
   searchResultsTitle: document.getElementById('search-results-title'),
   closeSearchResultsBtn: document.getElementById('close-search-results-btn'),
-  countrySelectLabel: document.querySelector('label[for="country-select"]'), // Added for loading state
+  countrySelectLabel: document.querySelector('label[for="country-select"]'),
 
   // Main Grid
-  calendarGrid: document.getElementById('calendar-grid'), // Use ID
-  // SYNTAX FIX: Used template literal (backticks) for querySelector arguments
-  calendarWeekdays: document.querySelector(`.${CSS_CLASSES.weekdaysContainer}`), // Use class
-  loadingOverlay: document.querySelector(`.${CSS_CLASSES.loadingOverlay}`), // Use class
-
-  // Sidebar
-  dayInfoDiv: document.getElementById('day-info'), // Use ID
-  upcomingTitle: document.getElementById('upcoming-title'), // Use ID
-  upcomingHolidaysList: document.getElementById('upcoming-holidays-list'), // Use ID
-
-  // Error/Retry Buttons
-  apiErrorMessage: document.getElementById('api-error-message'), // Use ID
-  upcomingErrorMessage: document.getElementById('upcoming-error-message'), // Use ID
-  retryHolidaysBtn: document.getElementById('retry-holidays-btn'),
-  retryUpcomingBtn: document.getElementById('retry-upcoming-btn'),
-  retryCountriesBtn: document.getElementById('retry-countries-btn'), // Added
-
-  // Weekday Labels Container (already referenced as calendarWeekdays)
-  // SYNTAX FIX: Used template literal (backticks) for querySelector argument
+  calendarGrid: document.getElementById('calendar-grid'),
+  loadingOverlay: document.querySelector(`.${CSS_CLASSES.loadingOverlay}`),
+  // Removed redundant calendarWeekdays, use weekdayLabelsContainer
   weekdayLabelsContainer: document.querySelector(`.${CSS_CLASSES.weekdaysContainer}`),
 
+  // Sidebar
+  dayInfoDiv: document.getElementById('day-info'),
+  upcomingTitle: document.getElementById('upcoming-title'),
+  upcomingHolidaysList: document.getElementById('upcoming-holidays-list'),
+
+  // Error/Retry Buttons
+  apiErrorMessage: document.getElementById('api-error-message'),
+  upcomingErrorMessage: document.getElementById('upcoming-error-message'),
+  retryHolidaysBtn: document.getElementById('retry-holidays-btn'),
+  retryUpcomingBtn: document.getElementById('retry-upcoming-btn'),
+  retryCountriesBtn: document.getElementById('retry-countries-btn'),
+
   // Print Header
-  printHeader: document.getElementById('print-header'), // Added
-  // SYNTAX FIX: Removed extraneous text artifact below
+  printHeader: document.getElementById('print-header'),
 };

@@ -1,297 +1,432 @@
 // js/ui.js
 import { CONFIG, CSS_CLASSES, DOM_ELEMENTS } from './config.js';
-import { state, updateState } from './state.js';
-import { t, i18n } from './i18n.js'; // Import full i18n for month names etc.
-import { formatDateYYYYMMDD, debounce } from './utils.js';
-import { handleMonthChange, handleYearInputChange, handleCountryChange, handleLanguageSwitch, handleThemeChange, handleViewChange, handleToday, handlePrev, handleNext, handleDateJumpChange, handleSearch, handleCloseSearchResults, handleRetryHolidays, handleRetryUpcoming } from './main.js'; // Import handlers
+import { state, updateState, getCurrentLocale } from './state.js';
+// Corrected import for formatDateIntl
+import { t, i18n, formatDateIntl } from './i18n.js';
+// Corrected import for getCountryName and createDocumentFragment
+import { formatDateYYYYMMDD, debounce, getCountryName, createDocumentFragment } from './utils.js';
+import {
+  handleMonthChange, handleYearInputChange, handleCountryChange, handleLanguageSwitch,
+  handleThemeChange, handleViewChange, handleToday, handlePrev, handleNext,
+  handleDateJumpChange, handleSearch, handleCloseSearchResults, handleRetryHolidays,
+  handleRetryUpcoming, handleRetryCountries, handleWeekStartChange
+} from './main.js';
+// Corrected import: added getMonth, getYear, isValid needed by displaySearchResults logic
+import { format, getMonth, getYear, isValid } from 'date-fns';
+
+// --- UI Population Functions ---
 
 /**
- * Populates the month and year selectors based on current state and config.
+ * Populates static selectors (Month, Year, Lang, Theme, View, Week Start).
  */
-export function populateSelectors() {
-    // Month Select
-    DOM_ELEMENTS.monthSelect.innerHTML = '';
-    i18n[state.currentLang].monthNames.forEach((name, index) => {
-        const option = document.createElement('option');
-        option.value = index; // 0-11
-        option.textContent = name;
-        if (index === state.currentMonth) {
-            option.selected = true;
-        }
-        DOM_ELEMENTS.monthSelect.appendChild(option);
-    });
+export function populateStaticSelectors() {
+  DOM_ELEMENTS.monthSelect.innerHTML = '';
+  const currentLangMonths = i18n[state.currentLang]?.monthNames || i18n['en'].monthNames;
+  currentLangMonths.forEach((name, index) => {
+    const option = document.createElement('option');
+    option.value = index;
+    option.textContent = name;
+    if (index === state.currentMonth) {
+      option.selected = true;
+    }
+    DOM_ELEMENTS.monthSelect.appendChild(option);
+  });
 
-    // Year Input
-    DOM_ELEMENTS.yearInput.min = CONFIG.MIN_YEAR;
-    DOM_ELEMENTS.yearInput.max = CONFIG.MAX_YEAR;
-    DOM_ELEMENTS.yearInput.value = state.currentYear;
-
-    // Country Select
-    DOM_ELEMENTS.countrySelect.value = state.selectedCountry;
-
-    // Language Select
-    DOM_ELEMENTS.langSelect.value = state.currentLang;
-
-    // Theme Select
-    DOM_ELEMENTS.themeSelect.value = state.currentTheme;
-
-     // View Select
-    DOM_ELEMENTS.viewSelect.value = state.currentView;
+  DOM_ELEMENTS.yearInput.min = CONFIG.MIN_YEAR;
+  DOM_ELEMENTS.yearInput.max = CONFIG.MAX_YEAR;
+  DOM_ELEMENTS.yearInput.value = state.currentYear;
+  DOM_ELEMENTS.langSelect.value = state.currentLang;
+  DOM_ELEMENTS.themeSelect.value = state.currentTheme;
+  DOM_ELEMENTS.viewSelect.value = state.currentView;
+  DOM_ELEMENTS.weekStartSelect.value = state.weekStartsOn.toString();
 }
+
+/**
+ * Populates the country selector dynamically.
+ * @param {Array | null} countries - Array of {countryCode, name} or null if error/loading.
+ */
+export function populateCountrySelector(countries) {
+  const select = DOM_ELEMENTS.countrySelect;
+  select.innerHTML = '';
+  DOM_ELEMENTS.retryCountriesBtn.hidden = true;
+
+  if (state.isLoadingCountries) {
+    const loadingOption = document.createElement('option');
+    loadingOption.textContent = t('selectCountryLoading');
+    loadingOption.disabled = true;
+    select.appendChild(loadingOption);
+    select.disabled = true;
+    return;
+  }
+
+  if (!countries) {
+    const errorOption = document.createElement('option');
+    errorOption.textContent = t('errorLoadingCountries').substring(0, 30) + '...';
+    errorOption.disabled = true;
+    select.appendChild(errorOption);
+    select.disabled = true;
+    displayCountryError(state.countriesError || t('errorLoadingCountries'));
+    return;
+  }
+
+  clearCountryError();
+  select.disabled = false;
+
+  const fragment = document.createDocumentFragment();
+  countries.forEach(country => {
+    const option = document.createElement('option');
+    option.value = country.countryCode;
+    option.textContent = country.name;
+    if (country.countryCode === state.selectedCountry) {
+      option.selected = true;
+    }
+    fragment.appendChild(option);
+  });
+  select.appendChild(fragment);
+}
+
 
 /**
  * Updates all UI text elements based on the current language.
  */
 export function translateUI() {
-    // Populate selectors first to get month names right
-    populateSelectors();
+  populateStaticSelectors();
 
-    // Buttons & Labels
-    document.documentElement.lang = state.currentLang; // Set HTML lang attribute
-    DOM_ELEMENTS.todayBtn.innerHTML = `<i class="fas fa-calendar-day"></i> ${t('today')}`;
-    document.querySelector('label[for="date-jump"]').textContent = t('jumpTo');
-    document.querySelector('label[for="country-select"]').textContent = t('selectCountry');
-    document.querySelector('label[for="lang-select"]').textContent = t('selectLang');
-    DOM_ELEMENTS.searchResultsTitle.textContent = t('searchResultsTitle'); // Base title
-    DOM_ELEMENTS.holidaySearchInput.placeholder = t('searchPlaceholder');
-    DOM_ELEMENTS.searchBtn.setAttribute('aria-label', t('searchHolidays'));
-    DOM_ELEMENTS.closeSearchResultsBtn.setAttribute('aria-label', t('closeSearchResults'));
+  if (state.availableCountriesCache) {
+    populateCountrySelector(state.availableCountriesCache);
+  }
 
-    // Dynamic ARIA labels for navigation based on view
-    updateNavigationLabels();
+  document.documentElement.lang = state.currentLang;
+  DOM_ELEMENTS.todayBtn.innerHTML = `<i class="fas fa-calendar-day"></i> ${t('today')}`;
+  const dateJumpLabel = document.querySelector('label[for="date-jump"]');
+  if (dateJumpLabel) dateJumpLabel.textContent = t('jumpTo');
+  // Update country label text (might be separate or part of populate selector)
+  if(DOM_ELEMENTS.countrySelectLabel) DOM_ELEMENTS.countrySelectLabel.textContent = t('selectCountry');
+  const langSelectLabel = document.querySelector('label[for="lang-select"]');
+  if (langSelectLabel) langSelectLabel.textContent = t('selectLang');
+  const weekStartLabel = document.querySelector('label[for="week-start-select"]');
+  if (weekStartLabel) weekStartLabel.textContent = t('selectWeekStart');
 
-    // Static ARIA labels
-    DOM_ELEMENTS.yearInput.setAttribute('aria-label', t('selectYear'));
-    DOM_ELEMENTS.monthSelect.setAttribute('aria-label', t('selectMonth'));
-    DOM_ELEMENTS.viewSelect.setAttribute('aria-label', t('selectView'));
-    DOM_ELEMENTS.themeSelect.setAttribute('aria-label', t('selectTheme'));
+  DOM_ELEMENTS.holidaySearchInput.placeholder = t('searchPlaceholder');
+  DOM_ELEMENTS.searchBtn.setAttribute('aria-label', t('searchHolidays'));
+  DOM_ELEMENTS.closeSearchResultsBtn.setAttribute('aria-label', t('closeSearchResults'));
 
-    // Retry buttons text
-    DOM_ELEMENTS.retryHolidaysBtn.querySelector('.retry-text').textContent = t('retry');
-    DOM_ELEMENTS.retryUpcomingBtn.querySelector('.retry-text').textContent = t('retry');
+  updateNavigationLabels();
 
-    // Select options (View/Theme)
-    DOM_ELEMENTS.viewSelect.querySelector('option[value="month"]').textContent = t('viewMonth');
-    DOM_ELEMENTS.viewSelect.querySelector('option[value="week"]').textContent = t('viewWeek');
-    DOM_ELEMENTS.viewSelect.querySelector('option[value="year"]').textContent = t('viewYear');
-    DOM_ELEMENTS.themeSelect.querySelector('option[value="light"]').textContent = t('themeLight');
-    DOM_ELEMENTS.themeSelect.querySelector('option[value="dark"]').textContent = t('themeDark');
+  DOM_ELEMENTS.yearInput.setAttribute('aria-label', t('selectYear'));
+  DOM_ELEMENTS.monthSelect.setAttribute('aria-label', t('selectMonth'));
+  DOM_ELEMENTS.viewSelect.setAttribute('aria-label', t('selectView'));
+  DOM_ELEMENTS.themeSelect.setAttribute('aria-label', t('selectTheme'));
+  DOM_ELEMENTS.weekStartSelect.setAttribute('aria-label', t('selectWeekStart'));
 
-    // Update Weekday headers
-    updateWeekdayHeaders();
+  const retryHolidaysText = DOM_ELEMENTS.retryHolidaysBtn.querySelector(`.${CSS_CLASSES.errorRetryText}`);
+  if (retryHolidaysText) retryHolidaysText.textContent = t('retry');
+  const retryUpcomingText = DOM_ELEMENTS.retryUpcomingBtn.querySelector(`.${CSS_CLASSES.errorRetryText}`);
+  if (retryUpcomingText) retryUpcomingText.textContent = t('retry');
+  const retryCountriesText = DOM_ELEMENTS.retryCountriesBtn.querySelector(`.${CSS_CLASSES.errorRetryText}`);
+  if (retryCountriesText) retryCountriesText.textContent = t('retry');
 
-    // Re-display errors if any, with current language
-    if (state.apiError) displayApiError(state.apiError);
-    if (state.upcomingError) displayUpcomingError(state.upcomingError);
+  const viewMonthOption = DOM_ELEMENTS.viewSelect.querySelector('option[value="month"]');
+  if(viewMonthOption) viewMonthOption.textContent = t('viewMonth');
+  const viewWeekOption = DOM_ELEMENTS.viewSelect.querySelector('option[value="week"]');
+  if(viewWeekOption) viewWeekOption.textContent = t('viewWeek');
+  const viewYearOption = DOM_ELEMENTS.viewSelect.querySelector('option[value="year"]');
+  if(viewYearOption) viewYearOption.textContent = t('viewYear');
+
+  const themeLightOption = DOM_ELEMENTS.themeSelect.querySelector('option[value="light"]');
+  if(themeLightOption) themeLightOption.textContent = t('themeLight');
+  const themeDarkOption = DOM_ELEMENTS.themeSelect.querySelector('option[value="dark"]');
+  if(themeDarkOption) themeDarkOption.textContent = t('themeDark');
+
+  const weekStartSunOption = DOM_ELEMENTS.weekStartSelect.querySelector('option[value="0"]');
+  if(weekStartSunOption) weekStartSunOption.textContent = t('weekStartSunday');
+  const weekStartMonOption = DOM_ELEMENTS.weekStartSelect.querySelector('option[value="1"]');
+  if(weekStartMonOption) weekStartMonOption.textContent = t('weekStartMonday');
+
+  updateWeekdayHeaders();
+
+  if (state.apiError) displayApiError(state.apiError);
+  if (state.upcomingError) displayUpcomingError(state.upcomingError);
+  if (state.countriesError) displayCountryError(state.countriesError);
+
+  updatePrintHeader();
 }
 
 /**
- * Updates the aria-labels for previous/next buttons based on the current view.
+ * Updates the aria-labels for previous/next buttons and visibility of month selector based on the current view.
  */
 export function updateNavigationLabels() {
-    let prevLabelKey, nextLabelKey;
-    switch(state.currentView) {
-        case 'week':
-            prevLabelKey = 'prevWeek';
-            nextLabelKey = 'nextWeek';
-            break;
-        case 'year':
-            prevLabelKey = 'prevYear';
-            nextLabelKey = 'nextYear';
-            break;
-        case 'month':
-        default:
-            prevLabelKey = 'prevMonth'; // Defaulting to month context for labels if needed
-            nextLabelKey = 'nextMonth';
-            // Or use the more generic ones:
-            // prevLabelKey = 'prevPeriod';
-            // nextLabelKey = 'nextPeriod';
-            break;
-    }
-    DOM_ELEMENTS.prevBtn.setAttribute('aria-label', t(prevLabelKey));
-    DOM_ELEMENTS.nextBtn.setAttribute('aria-label', t(nextLabelKey));
-
-    // Hide month selector in year/week view
-    DOM_ELEMENTS.monthSelect.style.display = (state.currentView === 'month') ? '' : 'none';
+  let prevLabelKey, nextLabelKey;
+  switch (state.currentView) {
+    case 'week':
+      prevLabelKey = 'prevWeek';
+      nextLabelKey = 'nextWeek';
+      break;
+    case 'year':
+      prevLabelKey = 'prevYear';
+      nextLabelKey = 'nextYear';
+      break;
+    case 'month':
+    default:
+      prevLabelKey = 'prevMonth';
+      nextLabelKey = 'nextMonth';
+      break;
+  }
+  DOM_ELEMENTS.prevBtn.setAttribute('aria-label', t(prevLabelKey));
+  DOM_ELEMENTS.nextBtn.setAttribute('aria-label', t(nextLabelKey));
+  DOM_ELEMENTS.monthSelect.style.display = (state.currentView === 'month') ? '' : 'none';
 }
-
 
 /**
- * Updates the weekday headers based on current language and view.
+ * Updates the weekday headers based on current language, view, and week start day.
  */
 export function updateWeekdayHeaders() {
-    const weekdaysContainer = DOM_ELEMENTS.weekdayLabelsContainer;
-    weekdaysContainer.innerHTML = ''; // Clear existing
+  const weekdaysContainer = DOM_ELEMENTS.weekdayLabelsContainer;
+  if (!weekdaysContainer) return;
 
-    const useMiniNames = state.currentView === 'year'; // Year view uses minimal names
-    const weekdays = useMiniNames ? i18n[state.currentLang].weekdaysMini : i18n[state.currentLang].weekdaysShort;
-    const firstDayOfWeek = 0; // Sunday start
+  weekdaysContainer.innerHTML = '';
+  weekdaysContainer.className = CSS_CLASSES.weekdaysContainer;
 
-    // Add "Wk" header for month/week view
-    if (state.currentView === 'month' || state.currentView === 'week') {
-        const wkHeader = document.createElement('div');
-        wkHeader.textContent = t('weekLabel').split(' ')[0]; // Get "Wk" or equivalent
-        weekdaysContainer.appendChild(wkHeader);
-    }
+  const currentLangData = i18n[state.currentLang] || i18n['en'];
+  const useShortNames = state.currentView !== 'year';
+  const weekdays = useShortNames ? currentLangData.weekdaysShort : currentLangData.weekdaysMini;
+  const firstDayOfWeek = state.weekStartsOn;
 
+  if (state.currentView === 'month' || state.currentView === 'week') {
+    const wkHeader = document.createElement('div');
+    wkHeader.classList.add(CSS_CLASSES.weekdaysHeader);
+    wkHeader.textContent = t('week');
+    weekdaysContainer.appendChild(wkHeader);
+  } else {
+    weekdaysContainer.classList.add(`${CSS_CLASSES.weekdaysContainer}--year-view`);
+  }
+
+  if (weekdays && weekdays.length === 7) {
     for (let i = 0; i < 7; i++) {
-        const dayIndex = (firstDayOfWeek + i) % 7;
-        const dayHeader = document.createElement('div');
-        dayHeader.textContent = weekdays[dayIndex];
-        weekdaysContainer.appendChild(dayHeader);
+      const dayIndex = (firstDayOfWeek + i) % 7;
+      const dayHeader = document.createElement('div');
+      dayHeader.classList.add(CSS_CLASSES.weekdaysHeader);
+      dayHeader.textContent = weekdays[dayIndex];
+      weekdaysContainer.appendChild(dayHeader);
     }
+  } else {
+      console.error("Weekday names not available for language:", state.currentLang);
+  }
 }
-
 
 /**
  * Updates the visual theme of the application.
  */
 export function applyTheme() {
-    // Remove existing theme classes/attributes
-    document.body.classList.remove('light-theme', 'dark-theme');
-    document.body.removeAttribute('data-theme');
-
-    // Apply the current theme
-    if (state.currentTheme === 'dark') {
-        document.body.setAttribute('data-theme', 'dark');
-        // Or use class: document.body.classList.add('dark-theme');
-    } else {
-         document.body.setAttribute('data-theme', 'light');
-        // Or use class: document.body.classList.add('light-theme');
-    }
-     // Update theme selector value
-    DOM_ELEMENTS.themeSelect.value = state.currentTheme;
+  document.body.classList.remove(CSS_CLASSES.themeLight, CSS_CLASSES.themeDark);
+  const themeClass = state.currentTheme === 'dark' ? CSS_CLASSES.themeDark : CSS_CLASSES.themeLight;
+  document.body.classList.add(themeClass);
+  DOM_ELEMENTS.themeSelect.value = state.currentTheme;
 }
 
-/**
- * Displays an error message in the main API error area.
- * @param {string} message - The error message.
- */
+// --- Error Display Functions ---
+
 export function displayApiError(message) {
-    DOM_ELEMENTS.apiErrorMessage.textContent = message;
-    DOM_ELEMENTS.retryHolidaysBtn.hidden = false;
+  DOM_ELEMENTS.apiErrorMessage.textContent = message;
+  DOM_ELEMENTS.apiErrorMessage.classList.remove(CSS_CLASSES.errorMessageHidden);
+  DOM_ELEMENTS.retryHolidaysBtn.hidden = false;
 }
 
-/** Clears the main API error message area. */
 export function clearApiError() {
-    DOM_ELEMENTS.apiErrorMessage.textContent = '';
-    DOM_ELEMENTS.retryHolidaysBtn.hidden = true;
+  DOM_ELEMENTS.apiErrorMessage.textContent = '';
+  DOM_ELEMENTS.apiErrorMessage.classList.add(CSS_CLASSES.errorMessageHidden);
+  DOM_ELEMENTS.retryHolidaysBtn.hidden = true;
 }
 
-/**
- * Displays an error message in the upcoming holidays error area.
- * @param {string} message - The error message.
- */
 export function displayUpcomingError(message) {
-    DOM_ELEMENTS.upcomingErrorMessage.textContent = message;
-    DOM_ELEMENTS.retryUpcomingBtn.hidden = false;
+  DOM_ELEMENTS.upcomingErrorMessage.textContent = message;
+  DOM_ELEMENTS.upcomingErrorMessage.classList.remove(CSS_CLASSES.errorMessageHidden);
+  DOM_ELEMENTS.retryUpcomingBtn.hidden = false;
+  DOM_ELEMENTS.upcomingHolidaysList.innerHTML = '';
 }
 
-/** Clears the upcoming holidays error message area. */
 export function clearUpcomingError() {
-    DOM_ELEMENTS.upcomingErrorMessage.textContent = '';
-    DOM_ELEMENTS.retryUpcomingBtn.hidden = true;
+  DOM_ELEMENTS.upcomingErrorMessage.textContent = '';
+  DOM_ELEMENTS.upcomingErrorMessage.classList.add(CSS_CLASSES.errorMessageHidden);
+  DOM_ELEMENTS.retryUpcomingBtn.hidden = true;
 }
 
-/** Displays the loading overlay for the main calendar grid. */
+export function displayCountryError(message) {
+  displayApiError(message);
+  DOM_ELEMENTS.retryCountriesBtn.hidden = false;
+  DOM_ELEMENTS.retryHolidaysBtn.hidden = true;
+}
+
+export function clearCountryError() {
+  if (state.countriesError && state.apiError === state.countriesError) {
+    clearApiError();
+  }
+  DOM_ELEMENTS.retryCountriesBtn.hidden = true;
+}
+
+// --- Loading State Functions ---
+
 export function showLoadingOverlay() {
-    DOM_ELEMENTS.loadingOverlay.hidden = false;
+  DOM_ELEMENTS.loadingOverlay.hidden = false;
 }
 
-/** Hides the loading overlay for the main calendar grid. */
 export function hideLoadingOverlay() {
-    DOM_ELEMENTS.loadingOverlay.hidden = true;
+  DOM_ELEMENTS.loadingOverlay.hidden = true;
 }
 
-/** Displays skeleton loading state for the upcoming holidays list. */
 export function showUpcomingLoading() {
-    DOM_ELEMENTS.upcomingHolidaysList.innerHTML = `
-        <li class="${CSS_CLASSES.skeleton}"></li>
-        <li class="${CSS_CLASSES.skeleton}"></li>
-        <li class="${CSS_CLASSES.skeleton}"></li>
-    `;
+  clearUpcomingError();
+  const list = DOM_ELEMENTS.upcomingHolidaysList;
+  list.innerHTML = '';
+  list.classList.add(CSS_CLASSES.upcomingList);
+
+  const fragment = document.createDocumentFragment();
+  for (let i = 0; i < 3; i++) {
+    const li = document.createElement('li');
+    li.classList.add(CSS_CLASSES.skeleton);
+    li.style.height = '45px';
+    fragment.appendChild(li);
+  }
+  list.appendChild(fragment);
 }
 
-/** Hides the loading state (clears the list for content). */
 export function hideUpcomingLoading() {
-    // The list will be replaced by actual content or error message
-    // No explicit hiding action needed here, just ensure loading replaces content
+  // No explicit action needed here.
 }
 
-/**
- * Displays an error message for the date jump input.
- * @param {string} message
- */
 export function displayDateJumpError(message) {
-    DOM_ELEMENTS.dateJumpError.textContent = message;
+  DOM_ELEMENTS.dateJumpError.textContent = message;
+  DOM_ELEMENTS.dateJumpInput.setAttribute('aria-invalid', 'true');
 }
 
-/** Clears the error message for the date jump input. */
 export function clearDateJumpError() {
-    DOM_ELEMENTS.dateJumpError.textContent = '';
+  DOM_ELEMENTS.dateJumpError.textContent = '';
+  DOM_ELEMENTS.dateJumpInput.removeAttribute('aria-invalid');
 }
 
 /**
  * Displays search results.
- * @param {Array} results - Array of { date: Date, holidayInfo: object }
+ * @param {Array} results - Array of { date: Date, holidayInfo: object, year: number }.
  * @param {string} query - The search query term.
  */
 export function displaySearchResults(results, query) {
-    DOM_ELEMENTS.searchResultsList.innerHTML = ''; // Clear previous results
+  DOM_ELEMENTS.searchResultsList.innerHTML = '';
+  DOM_ELEMENTS.searchResultsList.classList.add(CSS_CLASSES.searchResultsList);
 
-    if (results.length > 0) {
-        DOM_ELEMENTS.searchResultsTitle.textContent = t('searchResultsTitle', { query });
-        const fragment = document.createDocumentFragment();
-        const formatter = new Intl.DateTimeFormat(state.currentLang, { dateStyle: 'medium' });
+  if (results && results.length > 0) { // Added check for results array
+    DOM_ELEMENTS.searchResultsTitle.textContent = t('searchResultsTitle', { query });
+    const fragment = document.createDocumentFragment();
+    const currentViewYear = state.currentYear;
+    const locale = getCurrentLocale();
 
-        results.forEach(result => {
-            const li = document.createElement('li');
-            const dateStr = formatter.format(result.date);
-            const name = result.holidayInfo.name; // Use original name for consistency in results
-            li.innerHTML = `<span class="search-result-date">${dateStr}</span>: ${name}`;
-            // Optional: Add click handler to jump to the date
-            li.addEventListener('click', () => {
-                 const jumpDate = result.date;
-                 updateState({
-                     selectedDate: jumpDate,
-                     currentYear: jumpDate.getFullYear(),
-                     currentMonth: jumpDate.getMonth(),
-                     currentView: 'month' // Switch to month view to show selection
-                 });
-                 populateSelectors();
-                 handleViewChange(); // Trigger view update logic which includes render
-                 DOM_ELEMENTS.searchResultsContainer.hidden = true; // Close results
+    // Use the imported createDocumentFragment util
+    createDocumentFragment(results, (result) => {
+        if (!result || !result.date || !isValid(result.date)) return null; // Basic validation
+
+        const li = document.createElement('li');
+        li.classList.add(CSS_CLASSES.searchResultsItem);
+
+        const dateStr = format(result.date, 'PPP', { locale: locale });
+        const yearStr = result.year !== currentViewYear ? ` (${result.year})` : '';
+        const name = result.holidayInfo?.name || ''; // Use optional chaining
+
+        li.innerHTML = `<span class="${CSS_CLASSES.searchResultsItemDate}">${dateStr}${yearStr}</span>: ${name}`;
+        li.setAttribute('role', 'button');
+        li.tabIndex = 0;
+
+        const jumpToResult = () => {
+            const jumpDate = result.date;
+            if (!jumpDate || !isValid(jumpDate)) return; // Guard clause
+
+            updateState({
+                selectedDate: jumpDate,
+                currentYear: getYear(jumpDate),
+                currentMonth: getMonth(jumpDate),
+                currentView: 'month'
             });
-            li.style.cursor = 'pointer';
-            fragment.appendChild(li);
-        });
-        DOM_ELEMENTS.searchResultsList.appendChild(fragment);
-    } else {
-        DOM_ELEMENTS.searchResultsTitle.textContent = t('noSearchResults', { query });
-    }
+            populateStaticSelectors();
+            updateNavigationLabels();
+            // Directly call main.js functions or specific UI updates needed
+            // Using handleViewChange might be too broad, let's assume main exports fetch/render
+            // Import fetchAndRenderGrid from main.js if needed, or call simpler update functions
+            import('../main.js').then(main => { // Dynamic import example if needed
+                 main.fetchAndRenderGrid(); // Assuming fetchAndRenderGrid handles the rendering after state update
+                 main.updateDayInfoSidebar(jumpDate);
+            });
+            // If fetchAndRenderGrid is not directly callable, you might need another approach
+        };
 
-    DOM_ELEMENTS.searchResultsContainer.hidden = false;
+        li.addEventListener('click', jumpToResult);
+        li.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                jumpToResult();
+            }
+        });
+        return li; // Return the created node
+    });
+
+    DOM_ELEMENTS.searchResultsList.appendChild(fragment);
+
+  } else {
+    DOM_ELEMENTS.searchResultsTitle.textContent = t('noSearchResults', { query });
+  }
+  DOM_ELEMENTS.searchResultsContainer.classList.remove(CSS_CLASSES.searchResultsHidden);
 }
 
 
+/**
+ * Updates the hidden print header with context information.
+ */
+export function updatePrintHeader() {
+  if (!DOM_ELEMENTS.printHeader) return;
+
+  const countryName = getCountryName(DOM_ELEMENTS.countrySelect, state.selectedCountry);
+  let context = countryName;
+  const locale = getCurrentLocale();
+  const currentLangData = i18n[state.currentLang] || i18n['en'];
+
+  switch (state.currentView) {
+    case 'year':
+      context += ` - ${state.currentYear}`;
+      break;
+    case 'week':
+      if (state.currentWeekStart && isValid(state.currentWeekStart)) {
+        const weekStartFormatted = format(state.currentWeekStart, 'PPP', { locale });
+        context += ` - ${t('gridLabelWeek', { date: weekStartFormatted })}`;
+      } else {
+        context += ` - ${state.currentYear}`;
+      }
+      break;
+    case 'month':
+    default:
+      const monthName = currentLangData.monthNames[state.currentMonth];
+      context += ` - ${monthName} ${state.currentYear}`;
+      break;
+  }
+  DOM_ELEMENTS.printHeader.textContent = t('printTitle', { context });
+}
+
 /** Binds initial event listeners */
 export function bindEventListeners() {
-    DOM_ELEMENTS.monthSelect.addEventListener('change', handleMonthChange);
-    DOM_ELEMENTS.yearInput.addEventListener('change', handleYearInputChange);
-    DOM_ELEMENTS.countrySelect.addEventListener('change', handleCountryChange);
-    DOM_ELEMENTS.langSelect.addEventListener('change', handleLanguageSwitch);
-    DOM_ELEMENTS.themeSelect.addEventListener('change', handleThemeChange);
-    DOM_ELEMENTS.viewSelect.addEventListener('change', handleViewChange);
-    DOM_ELEMENTS.todayBtn.addEventListener('click', handleToday);
-    DOM_ELEMENTS.prevBtn.addEventListener('click', handlePrev);
-    DOM_ELEMENTS.nextBtn.addEventListener('click', handleNext);
-    DOM_ELEMENTS.dateJumpInput.addEventListener('change', handleDateJumpChange);
-    DOM_ELEMENTS.holidaySearchInput.addEventListener('search', handleSearch); // Handle clearing search
-    DOM_ELEMENTS.holidaySearchInput.addEventListener('input', debounce(handleSearch, 300)); // Debounced search on input
-    DOM_ELEMENTS.searchBtn.addEventListener('click', handleSearch);
-    DOM_ELEMENTS.closeSearchResultsBtn.addEventListener('click', handleCloseSearchResults);
-    DOM_ELEMENTS.retryHolidaysBtn.addEventListener('click', handleRetryHolidays);
-    DOM_ELEMENTS.retryUpcomingBtn.addEventListener('click', handleRetryUpcoming);
-
-    // Click/Keydown on grid handled in calendarGrid.js attachGridListeners
+  DOM_ELEMENTS.monthSelect.addEventListener('change', handleMonthChange);
+  // Pass event object to handlers that need it
+  DOM_ELEMENTS.yearInput.addEventListener('change', (event) => handleYearInputChange(event));
+  DOM_ELEMENTS.yearInput.addEventListener('input', debounce((event) => handleYearInputChange(event), 500));
+  DOM_ELEMENTS.countrySelect.addEventListener('change', handleCountryChange);
+  DOM_ELEMENTS.langSelect.addEventListener('change', handleLanguageSwitch);
+  DOM_ELEMENTS.themeSelect.addEventListener('change', handleThemeChange);
+  DOM_ELEMENTS.viewSelect.addEventListener('change', handleViewChange);
+  DOM_ELEMENTS.weekStartSelect.addEventListener('change', handleWeekStartChange);
+  DOM_ELEMENTS.todayBtn.addEventListener('click', handleToday);
+  DOM_ELEMENTS.prevBtn.addEventListener('click', handlePrev);
+  DOM_ELEMENTS.nextBtn.addEventListener('click', handleNext);
+  DOM_ELEMENTS.dateJumpInput.addEventListener('change', (event) => handleDateJumpChange(event));
+  DOM_ELEMENTS.holidaySearchInput.addEventListener('search', handleSearch);
+  DOM_ELEMENTS.holidaySearchInput.addEventListener('input', debounce(handleSearch, 350));
+  DOM_ELEMENTS.searchBtn.addEventListener('click', handleSearch);
+  DOM_ELEMENTS.closeSearchResultsBtn.addEventListener('click', handleCloseSearchResults);
+  DOM_ELEMENTS.retryHolidaysBtn.addEventListener('click', handleRetryHolidays);
+  DOM_ELEMENTS.retryUpcomingBtn.addEventListener('click', handleRetryUpcoming);
+  DOM_ELEMENTS.retryCountriesBtn.addEventListener('click', handleRetryCountries);
 }

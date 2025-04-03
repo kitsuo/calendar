@@ -1,10 +1,10 @@
 // js/calendarGrid.js
 import { CONFIG, CSS_CLASSES, DOM_ELEMENTS } from './config.js';
 import { state, updateState, getCurrentLocale, getHolidaysFromCache } from './state.js';
+// Corrected import for formatDateIntl
 import { t, getTranslatedHolidayName, translateHolidayType, i18n, formatDateIntl } from './i18n.js';
-// Note: Assuming these utils are defined/imported elsewhere if used correctly
-// import { formatDateYYYYMMDD, getWeekNumber, createDocumentFragment } from './utils.js';
-// Using standard document.createDocumentFragment and assuming formatDateYYYYMMDD/getWeekNumber are available
+// Corrected import for getWeekNumber and added createDocumentFragment if needed (though standard is used)
+import { formatDateYYYYMMDD, getWeekNumber } from './utils.js';
 import { updateDayInfoSidebar } from './sidebar.js';
 import { fetchHolidays } from './api.js'; // Needed for fetching holidays
 import { handleViewChange, handleMonthYearChange } from './main.js'; // Needed for year view click -> month view
@@ -18,114 +18,108 @@ let yearViewObserver = null; // For IntersectionObserver in year view
 // --- Helper Functions ---
 
 /**
- * Sets the time of a date object to midnight (00:00:00.000).
+ * Sets the time of a date object to midnight (00:00:00.000). Returns NEW date.
  * @param {Date} date
- * @returns {Date} The modified date object.
+ * @returns {Date} The new date object set to midnight.
  */
 function setTimeToMidnight(date) {
   if (date && isValid(date)) {
+    // set returns a new Date instance
     return set(date, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 });
   }
+  // Return the original invalid date or null/undefined as received
+  // Or throw an error, depending on desired strictness
   return date;
 }
 
 // --- Rendering Functions ---
 
-/**
- * Renders the calendar grid based on the current view.
- */
+/** Renders the calendar grid based on the current view. */
 export async function renderCalendarView() {
-  DOM_ELEMENTS.calendarGrid.innerHTML = ''; // Clear previous grid
-  // SYNTAX FIX: Used template literal (backticks) for className assignment
-  DOM_ELEMENTS.calendarGrid.className = `cal-grid ${CSS_CLASSES.gridMonthView}`; // Reset class, specific view class added below
-  DOM_ELEMENTS.calendarGrid.removeAttribute('aria-label'); // Clear old label
+  DOM_ELEMENTS.calendarGrid.innerHTML = '';
+  DOM_ELEMENTS.calendarGrid.className = `cal-grid`; // Base class, view specific added below
+  DOM_ELEMENTS.calendarGrid.removeAttribute('aria-label');
 
-  if (yearViewObserver) { // Disconnect previous observer if exists
+  if (yearViewObserver) {
     yearViewObserver.disconnect();
     yearViewObserver = null;
   }
-  // Clear previous search highlights
-  clearSearchHighlights(); // Assuming clearSearchHighlights is defined below
-
-  // Update weekday headers based on view
+  clearSearchHighlights();
   updateWeekdayHeaders();
 
   try {
-    // Fetch holidays for the current year being viewed
-    // For week view, it might span across year boundaries
+    // Simplified pre-fetching logic - fetch current year, let specific views fetch more if needed
     await fetchHolidays(state.currentYear, state.selectedCountry);
-    if ((state.currentView === 'week' || state.currentView === 'month') && state.currentWeekStart) {
-      const endOfWeekDate = addDays(state.currentWeekStart, 6);
-      const endOfWeekYear = getYear(endOfWeekDate);
-      if (endOfWeekYear !== state.currentYear) {
-        await fetchHolidays(endOfWeekYear, state.selectedCountry); // Fetch adjacent year if week/month spans boundary
-      }
-      // For month view, check if previous/next month days belong to different year
-      const firstDayOfMonth = startOfMonth(new Date(state.currentYear, state.currentMonth, 1));
-      const startOfGrid = startOfWeek(firstDayOfMonth, { weekStartsOn: state.weekStartsOn });
-      if (getYear(startOfGrid) !== state.currentYear) {
-        await fetchHolidays(getYear(startOfGrid), state.selectedCountry);
-      }
-      const lastDayOfMonth = endOfMonth(firstDayOfMonth);
-      const endOfGrid = endOfWeek(lastDayOfMonth, { weekStartsOn: state.weekStartsOn });
-      if (getYear(endOfGrid) !== state.currentYear) {
-        await fetchHolidays(getYear(endOfGrid), state.selectedCountry);
-      }
+
+    // Additional fetches based on view boundaries might be needed
+    // Let's assume view functions or fetchHolidays handle necessary adjacent data
+    if (state.currentView === 'month') {
+         const firstDayOfMonth = startOfMonth(new Date(state.currentYear, state.currentMonth, 1));
+         const startOfGrid = startOfWeek(firstDayOfMonth, { weekStartsOn: state.weekStartsOn });
+         if(getYear(startOfGrid) !== state.currentYear) {
+            await fetchHolidays(getYear(startOfGrid), state.selectedCountry);
+         }
+         const lastDayOfMonth = endOfMonth(firstDayOfMonth);
+         const endOfGrid = endOfWeek(lastDayOfMonth, { weekStartsOn: state.weekStartsOn });
+          if(getYear(endOfGrid) !== state.currentYear) {
+            await fetchHolidays(getYear(endOfGrid), state.selectedCountry);
+         }
+    } else if (state.currentView === 'week' && state.currentWeekStart) {
+         const endOfWeekDate = addDays(state.currentWeekStart, 6);
+         const endOfWeekYear = getYear(endOfWeekDate);
+         if (endOfWeekYear !== state.currentYear) {
+             await fetchHolidays(endOfWeekYear, state.selectedCountry);
+         }
     }
-    // Multi-year search requires fetching adjacent years too, handled in handleSearch
+
   } catch (error) {
     console.error("Error pre-fetching holidays for grid render:", error);
-    // Render grid without holiday info if fetch fails (error displayed by fetchHolidays)
   }
-  // SYNTAX FIX: Removed extraneous text artifact below
+
+  // Apply view-specific class AFTER clearing
+  const viewClass = state.currentView === 'month' ? CSS_CLASSES.gridMonthView :
+                    state.currentView === 'week' ? CSS_CLASSES.gridWeekView :
+                    state.currentView === 'year' ? CSS_CLASSES.gridYearView :
+                    CSS_CLASSES.gridMonthView; // Default to month view
+  DOM_ELEMENTS.calendarGrid.classList.add(viewClass);
+
 
   switch (state.currentView) {
     case 'week':
-      DOM_ELEMENTS.calendarGrid.classList.add(CSS_CLASSES.gridWeekView);
       renderWeekView(state.currentWeekStart);
       break;
     case 'year':
-      DOM_ELEMENTS.calendarGrid.classList.add(CSS_CLASSES.gridYearView);
-      renderYearView(state.currentYear); // Holidays fetched inside via IntersectionObserver or directly
+      renderYearView(state.currentYear);
       break;
     case 'month':
     default:
-      DOM_ELEMENTS.calendarGrid.classList.add(CSS_CLASSES.gridMonthView);
-      // Holidays for the year (and adjacent if needed) are expected to be in cache now
       renderMonthView(state.currentYear, state.currentMonth);
       break;
   }
 
-  // Re-apply search highlights if needed
   if (state.searchResults && state.searchResults.length > 0) {
-    applySearchHighlights(state.searchResults); // Assuming applySearchHighlights is defined below
+    applySearchHighlights(state.searchResults);
   }
-
-  // Attach event listeners after rendering
-  attachGridListeners(); // Assuming attachGridListeners is defined below
+  attachGridListeners();
 }
 
-/**
- * Renders the Month View grid.
- * @param {number} year
- * @param {number} month - 0-indexed month.
- */
+/** Renders the Month View grid. */
 function renderMonthView(year, month) {
   const firstDayOfMonth = startOfMonth(new Date(year, month, 1));
   const lastDayOfMonth = endOfMonth(firstDayOfMonth);
   const monthStartDate = startOfWeek(firstDayOfMonth, { weekStartsOn: state.weekStartsOn });
   const monthEndDate = endOfWeek(lastDayOfMonth, { weekStartsOn: state.weekStartsOn });
 
-  const gridLabel = t('gridLabelMonth', { month: i18n[state.currentLang].monthNames[month], year });
+  const currentLangData = i18n[state.currentLang] || i18n['en'];
+  const gridLabel = t('gridLabelMonth', { month: currentLangData.monthNames[month], year });
   DOM_ELEMENTS.calendarGrid.setAttribute('aria-label', gridLabel);
-  DOM_ELEMENTS.calendarGrid.innerHTML = ''; // Clear previous grid content
+  DOM_ELEMENTS.calendarGrid.innerHTML = '';
 
   const fragment = document.createDocumentFragment();
-  let currentDate = setTimeToMidnight(monthStartDate);
+  let currentDate = monthStartDate; // No need for midnight conversion here, comparison works
 
   while (currentDate <= monthEndDate) {
-    // --- Add Week Number Cell ---
-    const weekNum = getWeekNumber(currentDate); // Assumes getWeekNumber is available
+    const weekNum = getWeekNumber(currentDate);
     const weekNumberCell = document.createElement('div');
     weekNumberCell.classList.add(CSS_CLASSES.gridWeekNumber);
     weekNumberCell.textContent = weekNum;
@@ -133,9 +127,8 @@ function renderMonthView(year, month) {
     weekNumberCell.setAttribute('aria-label', t('weekLabel', { weekNum }));
     fragment.appendChild(weekNumberCell);
 
-    // --- Add Day Cells for the week ---
     for (let i = 0; i < 7; i++) {
-      const cellDate = setTimeToMidnight(currentDate); // Ensure midnight for comparisons
+      const cellDate = currentDate; // Use directly
       const dayCell = document.createElement('div');
       dayCell.classList.add(CSS_CLASSES.gridDayCell);
       dayCell.setAttribute('role', 'gridcell');
@@ -144,19 +137,19 @@ function renderMonthView(year, month) {
       dayNumberSpan.classList.add(CSS_CLASSES.gridDayNumber);
       dayNumberSpan.textContent = getDate(cellDate);
 
-      const dateString = formatDateYYYYMMDD(cellDate); // Assumes formatDateYYYYMMDD is available
+      const dateString = formatDateYYYYMMDD(cellDate);
       const cellYear = getYear(cellDate);
       const cellMonth = getMonth(cellDate);
       const holidaysForCellYear = getHolidaysFromCache(state.selectedCountry, cellYear);
-      const holidayInfo = holidaysForCellYear ? holidaysForCellYear[dateString] : null; // Added null check
+      const holidayInfo = holidaysForCellYear ? holidaysForCellYear[dateString] : null;
 
       const isCurrentMonth = cellMonth === month;
       const isToday = isSameDay(cellDate, state.today);
       const isSelected = state.selectedDate && isSameDay(cellDate, state.selectedDate);
-      const dayOfWeek = getDay(cellDate); // 0=Sun, 6=Sat
+      const dayOfWeek = getDay(cellDate);
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-      let ariaLabel = formatDateIntl(cellDate, { dateStyle: 'full' }); // Assumes formatDateIntl is available
+      let ariaLabel = formatDateIntl(cellDate, { dateStyle: 'full' }); // Use imported function
 
       if (isToday) {
         dayCell.classList.add(CSS_CLASSES.cellToday);
@@ -173,65 +166,59 @@ function renderMonthView(year, month) {
       if (!isCurrentMonth) {
         dayCell.classList.add(CSS_CLASSES.cellOtherMonth);
         dayCell.setAttribute('aria-disabled', 'true');
-        dayCell.setAttribute('tabindex', '-1'); // Not focusable
+        dayCell.setAttribute('tabindex', '-1');
       } else {
-        dayCell.setAttribute('tabindex', '0'); // Focusable
-        dayCell.dataset.date = dateString; // Only add data-date for current month days
+        dayCell.setAttribute('tabindex', '0');
+        dayCell.dataset.date = dateString;
       }
 
-      if (holidayInfo && isCurrentMonth) { // Only show holiday details for current month days visually? Or all? Showing all for clarity.
-        dayCell.classList.add(CSS_CLASSES.cellHoliday);
-        const typeClass = `${CSS_CLASSES.cellHolidayTypePrefix}${(holidayInfo.type || 'Unknown').replace(/\s+/g, '-')}`;
-        dayCell.classList.add(typeClass.toLowerCase()); // Use lowercase class names
-        const holidayNameSpan = document.createElement('span');
-        holidayNameSpan.classList.add(CSS_CLASSES.gridHolidayName);
-        const translatedName = getTranslatedHolidayName(dateString, holidayInfo.name); // Assumes getTranslatedHolidayName is available
-        holidayNameSpan.textContent = translatedName;
-        holidayNameSpan.title = translatedName;
-        dayCell.appendChild(holidayNameSpan);
-        const translatedType = translateHolidayType(holidayInfo.type); // Assumes translateHolidayType is available
-        const typeText = holidayInfo.type ? t('holidayType', { type: translatedType }) : t('publicHoliday');
-        ariaLabel += `, ${typeText}, ${translatedName}`;
-      } else if (holidayInfo) { // Still add base holiday class for other month days if they are holidays
+      if (holidayInfo) { // Add holiday info regardless of month for consistency
         dayCell.classList.add(CSS_CLASSES.cellHoliday);
         const typeClass = `${CSS_CLASSES.cellHolidayTypePrefix}${(holidayInfo.type || 'Unknown').replace(/\s+/g, '-')}`;
         dayCell.classList.add(typeClass.toLowerCase());
-      }
 
+        if (isCurrentMonth) { // Only add text/ARIA details for current month holidays
+             const holidayNameSpan = document.createElement('span');
+             holidayNameSpan.classList.add(CSS_CLASSES.gridHolidayName);
+             const translatedName = getTranslatedHolidayName(dateString, holidayInfo.name);
+             holidayNameSpan.textContent = translatedName;
+             holidayNameSpan.title = translatedName;
+             dayCell.appendChild(holidayNameSpan);
+
+             const translatedType = translateHolidayType(holidayInfo.type);
+             const typeText = holidayInfo.type ? t('holidayType', { type: translatedType }) : t('publicHoliday');
+             ariaLabel += `, ${typeText}, ${translatedName}`;
+        }
+      }
 
       dayCell.setAttribute('aria-label', ariaLabel);
       dayCell.prepend(dayNumberSpan);
       fragment.appendChild(dayCell);
 
-      currentDate = addDays(currentDate, 1); // Move to the next day
+      currentDate = addDays(currentDate, 1);
     }
-    // SYNTAX FIX: Removed extraneous text artifact below
   }
   DOM_ELEMENTS.calendarGrid.appendChild(fragment);
 }
 
-/**
- * Renders the Week View grid.
- * @param {Date} weekStartDate - The starting date of the week (passed from state, respecting weekStartsOn).
- */
+/** Renders the Week View grid. */
 function renderWeekView(weekStartDate) {
-  if (!weekStartDate || !isValid(weekStartDate)) {
-    console.error("Invalid weekStartDate for renderWeekView");
-    // Recalculate based on current state if invalid
-    weekStartDate = startOfWeek(state.selectedDate || state.today, { weekStartsOn: state.weekStartsOn });
-    updateState({ currentWeekStart: weekStartDate }); // Update state if corrected
+  let currentWeekStart = weekStartDate;
+  if (!currentWeekStart || !isValid(currentWeekStart)) {
+    console.warn("Invalid or missing weekStartDate for renderWeekView, recalculating.");
+    currentWeekStart = startOfWeek(state.selectedDate || state.today, { weekStartsOn: state.weekStartsOn });
+    updateState({ currentWeekStart: currentWeekStart });
   }
-  weekStartDate = setTimeToMidnight(weekStartDate); // Ensure midnight
+  // Ensure midnight only if needed for comparison logic (isSameDay handles it)
+  // currentWeekStart = setTimeToMidnight(currentWeekStart);
 
   const locale = getCurrentLocale();
-  const gridLabel = t('gridLabelWeek', { date: format(weekStartDate, 'PPP', { locale }) });
+  const gridLabel = t('gridLabelWeek', { date: format(currentWeekStart, 'PPP', { locale }) });
   DOM_ELEMENTS.calendarGrid.setAttribute('aria-label', gridLabel);
-  DOM_ELEMENTS.calendarGrid.innerHTML = ''; // Clear grid
+  DOM_ELEMENTS.calendarGrid.innerHTML = '';
 
   const fragment = document.createDocumentFragment();
-
-  // --- Add Week Number Cell ---
-  const weekNum = getWeekNumber(weekStartDate); // Assumes getWeekNumber is available
+  const weekNum = getWeekNumber(currentWeekStart);
   const weekNumberCell = document.createElement('div');
   weekNumberCell.classList.add(CSS_CLASSES.gridWeekNumber);
   weekNumberCell.textContent = weekNum;
@@ -239,9 +226,8 @@ function renderWeekView(weekStartDate) {
   weekNumberCell.setAttribute('aria-label', t('weekLabel', { weekNum }));
   fragment.appendChild(weekNumberCell);
 
-  // --- Add Day Cells ---
   for (let i = 0; i < 7; i++) {
-    const cellDate = setTimeToMidnight(addDays(weekStartDate, i)); // Ensure midnight
+    const cellDate = addDays(currentWeekStart, i);
     const dayCell = document.createElement('div');
     dayCell.classList.add(CSS_CLASSES.gridDayCell);
     dayCell.setAttribute('role', 'gridcell');
@@ -250,17 +236,17 @@ function renderWeekView(weekStartDate) {
     dayNumberSpan.classList.add(CSS_CLASSES.gridDayNumber);
     dayNumberSpan.textContent = getDate(cellDate);
 
-    const dateString = formatDateYYYYMMDD(cellDate); // Assumes formatDateYYYYMMDD is available
+    const dateString = formatDateYYYYMMDD(cellDate);
     const cellYear = getYear(cellDate);
     const holidaysForCellYear = getHolidaysFromCache(state.selectedCountry, cellYear);
-    const holidayInfo = holidaysForCellYear ? holidaysForCellYear[dateString] : null; // Added null check
+    const holidayInfo = holidaysForCellYear ? holidaysForCellYear[dateString] : null;
 
     const isToday = isSameDay(cellDate, state.today);
     const isSelected = state.selectedDate && isSameDay(cellDate, state.selectedDate);
     const dayOfWeek = getDay(cellDate);
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-    let ariaLabel = formatDateIntl(cellDate, { dateStyle: 'full' }); // Assumes formatDateIntl is available
+    let ariaLabel = formatDateIntl(cellDate, { dateStyle: 'full' }); // Use imported function
 
     if (isToday) {
       dayCell.classList.add(CSS_CLASSES.cellToday);
@@ -282,12 +268,12 @@ function renderWeekView(weekStartDate) {
 
       const holidayNameSpan = document.createElement('span');
       holidayNameSpan.classList.add(CSS_CLASSES.gridHolidayName);
-      const translatedName = getTranslatedHolidayName(dateString, holidayInfo.name); // Assumes getTranslatedHolidayName is available
+      const translatedName = getTranslatedHolidayName(dateString, holidayInfo.name);
       holidayNameSpan.textContent = translatedName;
       holidayNameSpan.title = translatedName;
-      dayCell.appendChild(holidayNameSpan); // Append name
+      dayCell.appendChild(holidayNameSpan);
 
-      const translatedType = translateHolidayType(holidayInfo.type); // Assumes translateHolidayType is available
+      const translatedType = translateHolidayType(holidayInfo.type);
       const typeText = holidayInfo.type ? t('holidayType', { type: translatedType }) : t('publicHoliday');
       ariaLabel += `, ${typeText}, ${translatedName}`;
     }
@@ -296,125 +282,75 @@ function renderWeekView(weekStartDate) {
     dayCell.setAttribute('tabindex', '0');
     dayCell.setAttribute('aria-label', ariaLabel);
 
-    dayCell.prepend(dayNumberSpan); // Prepend number
-    fragment.appendChild(dayCell); // Append cell
-    // SYNTAX FIX: Removed extraneous text artifact below
+    dayCell.prepend(dayNumberSpan);
+    fragment.appendChild(dayCell);
   }
   DOM_ELEMENTS.calendarGrid.appendChild(fragment);
 }
 
-/**
- * Renders the container and headers for the Year View.
- * Delegates rendering of mini-calendars to an IntersectionObserver.
- * @param {number} year
- */
+
+/** Renders the Year View grid. */
 function renderYearView(year) {
   const gridLabel = t('gridLabelYear', { year });
   DOM_ELEMENTS.calendarGrid.setAttribute('aria-label', gridLabel);
-  DOM_ELEMENTS.calendarGrid.innerHTML = ''; // Clear grid
+  DOM_ELEMENTS.calendarGrid.innerHTML = '';
 
   const fragment = document.createDocumentFragment();
-  const miniWeekdays = i18n[state.currentLang].weekdaysMini;
-  const weekdaysStart = state.weekStartsOn; // 0 or 1
+  const currentLangData = i18n[state.currentLang] || i18n['en'];
+  const miniWeekdays = currentLangData.weekdaysMini;
+  const weekdaysStart = state.weekStartsOn;
 
-  // Ensure holidays for the year are fetched before setting up observer
+  // Fetch holidays needed for the ENTIRE year view rendering
   fetchHolidays(year, state.selectedCountry).then(holidaysForYear => {
-    // If fetchHolidays resolved with null/undefined (e.g., due to error), provide empty object
-    const validHolidaysForYear = holidaysForYear || {};
+      const validHolidaysForYear = holidaysForYear || {}; // Ensure it's an object
 
-    for (let month = 0; month < 12; month++) {
-      const monthContainer = document.createElement('div');
-      monthContainer.classList.add(CSS_CLASSES.gridMonthContainer);
-      monthContainer.dataset.monthIndex = month; // Store month index
+      for (let month = 0; month < 12; month++) {
+          const monthContainer = document.createElement('div');
+          monthContainer.classList.add(CSS_CLASSES.gridMonthContainer);
+          monthContainer.dataset.monthIndex = month;
 
-      // --- Month Header (Clickable) ---
-      const monthHeader = document.createElement('div');
-      monthHeader.classList.add(CSS_CLASSES.gridMonthHeader);
-      const monthName = i18n[state.currentLang].monthNames[month];
-      monthHeader.textContent = monthName;
-      monthHeader.setAttribute('role', 'button'); // Make it act like a button
-      monthHeader.setAttribute('tabindex', '0');
-      monthHeader.dataset.year = year;
-      monthHeader.dataset.month = month;
-      monthHeader.setAttribute('aria-label', t('gridLabelYearMonth', { month: monthName, year }));
-      monthContainer.appendChild(monthHeader);
+          const monthHeader = document.createElement('div');
+          monthHeader.classList.add(CSS_CLASSES.gridMonthHeader);
+          const monthName = currentLangData.monthNames[month];
+          monthHeader.textContent = monthName;
+          monthHeader.setAttribute('role', 'button');
+          monthHeader.setAttribute('tabindex', '0');
+          monthHeader.dataset.year = year;
+          monthHeader.dataset.month = month;
+          monthHeader.setAttribute('aria-label', t('gridLabelYearMonth', { month: monthName, year }));
+          monthContainer.appendChild(monthHeader);
 
-      // --- Mini Weekday Headers ---
-      const miniWeekdaysDiv = document.createElement('div');
-      miniWeekdaysDiv.classList.add(CSS_CLASSES.gridMiniWeekdays);
-      miniWeekdaysDiv.setAttribute('aria-hidden', 'true'); // Decorative
-      for (let i = 0; i < 7; i++) {
-        const dayIndex = (weekdaysStart + i) % 7;
-        const wdDiv = document.createElement('div');
-        wdDiv.textContent = miniWeekdays[dayIndex];
-        miniWeekdaysDiv.appendChild(wdDiv);
+          const miniWeekdaysDiv = document.createElement('div');
+          miniWeekdaysDiv.classList.add(CSS_CLASSES.gridMiniWeekdays);
+          miniWeekdaysDiv.setAttribute('aria-hidden', 'true');
+          if (miniWeekdays && miniWeekdays.length === 7) {
+              for (let i = 0; i < 7; i++) {
+                  const dayIndex = (weekdaysStart + i) % 7;
+                  const wdDiv = document.createElement('div');
+                  wdDiv.textContent = miniWeekdays[dayIndex];
+                  miniWeekdaysDiv.appendChild(wdDiv);
+              }
+          }
+          monthContainer.appendChild(miniWeekdaysDiv);
+
+          // Render mini calendar directly instead of using observer for simplicity here
+          // Observer adds complexity; direct render might be acceptable if year view isn't too slow
+          renderMiniCalendar(monthContainer, year, month, validHolidaysForYear);
+
+          fragment.appendChild(monthContainer);
       }
-      monthContainer.appendChild(miniWeekdaysDiv);
+      DOM_ELEMENTS.calendarGrid.appendChild(fragment);
+      // No observer setup needed if rendering directly
 
-      // --- Mini Calendar Placeholder ---
-      const miniGridPlaceholder = document.createElement('div');
-      miniGridPlaceholder.classList.add(CSS_CLASSES.gridMiniCalendarPlaceholder);
-      // Add minimum height to avoid layout shifts and ensure it can be observed
-      miniGridPlaceholder.style.minHeight = '150px'; // Adjust as needed
-      monthContainer.appendChild(miniGridPlaceholder);
-
-      fragment.appendChild(monthContainer);
-    }
-    DOM_ELEMENTS.calendarGrid.appendChild(fragment);
-
-    // Setup Intersection Observer (pass potentially empty holidays object)
-    setupYearViewObserver(year, validHolidaysForYear);
-    // SYNTAX FIX: Removed extraneous text artifact below
   }).catch(error => {
-    console.error("Failed to fetch holidays for year view:", error);
-    // Error is already displayed by fetchHolidays
+      console.error("Failed to fetch holidays for year view:", error);
+      // Error should be displayed by fetchHolidays via displayApiError
   });
 }
 
-/**
- * Sets up the IntersectionObserver to render mini-calendars when they become visible.
- * @param {number} year
- * @param {object} holidaysForYear - Holiday data map for the year.
- */
-function setupYearViewObserver(year, holidaysForYear) {
-  const options = {
-    root: DOM_ELEMENTS.calendarGrid, // Observe within the grid container
-    rootMargin: '0px 0px 100px 0px', // Load slightly before fully visible
-    threshold: 0.01 // Trigger even if only a tiny bit is visible
-  };
+// Removed setupYearViewObserver function as it's not used with direct render
 
-  yearViewObserver = new IntersectionObserver((entries, observer) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const placeholder = entry.target;
-        // SYNTAX FIX: Used template literal for closest() argument
-        const monthContainer = placeholder.closest(`.${CSS_CLASSES.gridMonthContainer}`);
-        if (monthContainer && monthContainer.dataset.monthIndex) {
-          const monthIndex = parseInt(monthContainer.dataset.monthIndex, 10);
-          // Render the actual mini-calendar content
-          renderMiniCalendar(monthContainer, year, monthIndex, holidaysForYear);
-          // Stop observing this placeholder once rendered
-          observer.unobserve(placeholder);
-          // Remove placeholder after rendering
-          placeholder.remove();
-        }
-      }
-    });
-  }, options);
-
-  // Start observing all placeholders
-  // SYNTAX FIX: Used template literal for querySelectorAll() argument
-  const placeholders = DOM_ELEMENTS.calendarGrid.querySelectorAll(`.${CSS_CLASSES.gridMiniCalendarPlaceholder}`);
-  placeholders.forEach(placeholder => yearViewObserver.observe(placeholder));
-}
-
-/**
- * Renders the actual mini-calendar grid for a specific month in the year view.
- * @param {HTMLElement} monthContainer - The container element for the month.
- * @param {number} year
- * @param {number} month - 0-indexed month.
- * @param {object} holidaysForYear - Holiday data map for the entire year.
- */
+/** Renders the mini-calendar grid for Year View. */
 function renderMiniCalendar(monthContainer, year, month, holidaysForYear) {
   const miniGrid = document.createElement('div');
   miniGrid.classList.add(CSS_CLASSES.gridMiniCalendar);
@@ -425,27 +361,26 @@ function renderMiniCalendar(monthContainer, year, month, holidaysForYear) {
   const endDate = endOfWeek(lastDayOfMonth, { weekStartsOn: state.weekStartsOn });
 
   const locale = getCurrentLocale();
-  let currentDate = setTimeToMidnight(startDate);
+  let currentDate = startDate; // No need for midnight conversion
 
   while (currentDate <= endDate) {
-    const cellDate = setTimeToMidnight(currentDate); // Use a new date object for modifications
+    const cellDate = currentDate;
     const monthCell = document.createElement('div');
     monthCell.classList.add(CSS_CLASSES.gridMonthCell);
     monthCell.setAttribute('role', 'gridcell');
     monthCell.textContent = getDate(cellDate);
 
-    const dateString = formatDateYYYYMMDD(cellDate); // Assumes formatDateYYYYMMDD is available
+    const dateString = formatDateYYYYMMDD(cellDate);
     const cellMonth = getMonth(cellDate);
-    const holidayInfo = holidaysForYear ? holidaysForYear[dateString] : null; // Added null check
+    const holidayInfo = holidaysForYear ? holidaysForYear[dateString] : null;
     const isCurrentMonth = cellMonth === month;
     const isToday = isSameDay(cellDate, state.today);
     const isSelected = state.selectedDate && isSameDay(cellDate, state.selectedDate);
     const dayOfWeek = getDay(cellDate);
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-    // Add classes for styling
     if (isToday) monthCell.classList.add(CSS_CLASSES.cellToday);
-    if (isSelected && isCurrentMonth) monthCell.classList.add(CSS_CLASSES.cellSelected); // Select only current month days
+    if (isSelected && isCurrentMonth) monthCell.classList.add(CSS_CLASSES.cellSelected);
     if (isWeekend) monthCell.classList.add(CSS_CLASSES.cellWeekend);
 
     if (!isCurrentMonth) {
@@ -454,128 +389,92 @@ function renderMiniCalendar(monthContainer, year, month, holidaysForYear) {
       monthCell.setAttribute('tabindex', '-1');
     } else {
       monthCell.dataset.date = dateString;
-      monthCell.setAttribute('tabindex', '0'); // Focusable
-      // Basic label, could be enhanced if needed
-      monthCell.setAttribute('aria-label', format(cellDate, 'PPP', { locale }));
-      if (isSelected) monthCell.setAttribute('aria-label', monthCell.getAttribute('aria-label') + `, ${t('selected')}`);
-      if (isWeekend) monthCell.setAttribute('aria-label', monthCell.getAttribute('aria-label') + `, ${t('weekend')}`);
+      monthCell.setAttribute('tabindex', '0');
+      let ariaLabel = format(cellDate, 'PPP', { locale });
+      if(isSelected) ariaLabel += `, ${t('selected')}`;
+      if(isWeekend) ariaLabel += `, ${t('weekend')}`;
+      monthCell.setAttribute('aria-label', ariaLabel);
     }
 
-    if (holidayInfo && isCurrentMonth) { // Indicate holidays visually
-      monthCell.classList.add(CSS_CLASSES.cellHoliday);
-      const typeClass = `${CSS_CLASSES.cellHolidayTypePrefix}${(holidayInfo.type || 'Unknown').replace(/\s+/g, '-')}`;
-      monthCell.classList.add(typeClass.toLowerCase());
-      const translatedName = getTranslatedHolidayName(dateString, holidayInfo.name); // Assumes getTranslatedHolidayName is available
-      monthCell.setAttribute('title', translatedName); // Tooltip for holiday name
-      if (isCurrentMonth) { // Add holiday info to ARIA label only for current month
-        const translatedType = translateHolidayType(holidayInfo.type); // Assumes translateHolidayType is available
-        const typeText = holidayInfo.type ? t('holidayType', { type: translatedType }) : t('publicHoliday');
-        monthCell.setAttribute('aria-label', monthCell.getAttribute('aria-label') + `, ${typeText}, ${translatedName}`);
-      }
-    } else if (holidayInfo) { // Still add base class for styling other month holidays
-      monthCell.classList.add(CSS_CLASSES.cellHoliday);
-      const typeClass = `${CSS_CLASSES.cellHolidayTypePrefix}${(holidayInfo.type || 'Unknown').replace(/\s+/g, '-')}`;
-      monthCell.classList.add(typeClass.toLowerCase());
-    }
+    if (holidayInfo) { // Add holiday class regardless of month
+         monthCell.classList.add(CSS_CLASSES.cellHoliday);
+         const typeClass = `${CSS_CLASSES.cellHolidayTypePrefix}${(holidayInfo.type || 'Unknown').replace(/\s+/g, '-')}`;
+         monthCell.classList.add(typeClass.toLowerCase());
 
+        if (isCurrentMonth) { // Only add tooltip and enhance ARIA for current month
+            const translatedName = getTranslatedHolidayName(dateString, holidayInfo.name);
+            monthCell.setAttribute('title', translatedName);
+            const translatedType = translateHolidayType(holidayInfo.type);
+            const typeText = holidayInfo.type ? t('holidayType', { type: translatedType }) : t('publicHoliday');
+            let currentAriaLabel = monthCell.getAttribute('aria-label') || '';
+            monthCell.setAttribute('aria-label', currentAriaLabel + `, ${typeText}, ${translatedName}`);
+        }
+    }
 
     miniGrid.appendChild(monthCell);
     currentDate = addDays(currentDate, 1);
-    // SYNTAX FIX: Removed extraneous text artifact below
   }
-  // Append the rendered grid, replacing the placeholder content implicitly
   monthContainer.appendChild(miniGrid);
 }
 
 // --- Event Handling ---
 
-/**
- * Handles clicks within the calendar grid (delegated).
- * Includes handling clicks on year view month headers.
- * @param {Event} event
- */
 function handleCalendarClick(event) {
-  // SYNTAX FIX: Used template literals for closest() arguments
   const dayCellTarget = event.target.closest(`.${CSS_CLASSES.gridDayCell}:not(.${CSS_CLASSES.cellOtherMonth}), .${CSS_CLASSES.gridMonthCell}:not(.${CSS_CLASSES.cellOtherMonth})`);
   const monthHeaderTarget = event.target.closest(`.${CSS_CLASSES.gridMonthHeader}`);
 
   if (dayCellTarget && dayCellTarget.dataset.date) {
-    // --- Day Cell Clicked ---
     const newSelectedDate = parseISO(dayCellTarget.dataset.date);
     if (!isValid(newSelectedDate)) {
       console.error("Invalid date clicked:", dayCellTarget.dataset.date);
       return;
     }
-    // setTimeToMidnight(newSelectedDate); // setTimeToMidnight returns a new date, doesn't modify in place
+    const finalSelectedDate = setTimeToMidnight(newSelectedDate); // Use helper that returns new date
 
-    const finalSelectedDate = setTimeToMidnight(newSelectedDate); // Use the returned date
-
-    // Check if selection actually changed
     const selectionChanged = !state.selectedDate || !isSameDay(finalSelectedDate, state.selectedDate);
 
     if (selectionChanged) {
-      // 1. Remove previous selection class
       const previousSelected = DOM_ELEMENTS.calendarGrid.querySelector(`.${CSS_CLASSES.cellSelected}`);
       if (previousSelected) {
         previousSelected.classList.remove(CSS_CLASSES.cellSelected);
-        updateCellAriaLabel(previousSelected, false); // Update ARIA
+        updateCellAriaLabel(previousSelected, false);
       }
-
-      // 2. Add new selection class
       dayCellTarget.classList.add(CSS_CLASSES.cellSelected);
-      updateCellAriaLabel(dayCellTarget, true); // Update ARIA
-
-      // 3. Update state
-      updateState({ selectedDate: finalSelectedDate }); // Use the date set to midnight
-
-      // 4. Update sidebar info
-      updateDayInfoSidebar(finalSelectedDate); // Use the date set to midnight
+      updateCellAriaLabel(dayCellTarget, true);
+      updateState({ selectedDate: finalSelectedDate });
+      updateDayInfoSidebar(finalSelectedDate);
     }
 
-    // If year view was clicked, switch to month view for that date
-    if (state.currentView === 'year' && selectionChanged) {
-      handleMonthYearChange(getYear(finalSelectedDate), getMonth(finalSelectedDate));
-      // handleMonthYearChange will update state and trigger render/UI updates
-    } else if (state.currentView === 'year') {
-      // If clicking the same date again in year view, still switch
+    if (state.currentView === 'year') { // Always switch from year view on click
       handleMonthYearChange(getYear(finalSelectedDate), getMonth(finalSelectedDate));
     }
-    // SYNTAX FIX: Removed extraneous text artifact below
   } else if (monthHeaderTarget && monthHeaderTarget.dataset.year && monthHeaderTarget.dataset.month) {
-    // --- Year View Month Header Clicked ---
     const year = parseInt(monthHeaderTarget.dataset.year, 10);
     const month = parseInt(monthHeaderTarget.dataset.month, 10);
     console.debug(`Year view month header clicked: ${month}/${year}`);
-    handleMonthYearChange(year, month); // Use dedicated handler
+    handleMonthYearChange(year, month);
   }
 }
 
-/**
- * Handles keyboard navigation and activation within the calendar grid.
- * @param {KeyboardEvent} event
- */
 function handleGridKeyDown(event) {
   const { key, target } = event;
-  // SYNTAX FIX: Used template literals for matches() arguments
   const isDayCell = target.matches(`.${CSS_CLASSES.gridDayCell}:not(.${CSS_CLASSES.cellOtherMonth}), .${CSS_CLASSES.gridMonthCell}:not(.${CSS_CLASSES.cellOtherMonth})`);
   const isMonthHeader = target.matches(`.${CSS_CLASSES.gridMonthHeader}`);
 
-  // --- Activation (Enter/Space) ---
   if (key === 'Enter' || key === ' ') {
     if (isDayCell || isMonthHeader) {
       event.preventDefault();
-      handleCalendarClick({ target: target }); // Simulate a click event
+      handleCalendarClick({ target: target });
       return;
     }
   }
 
-  // --- Arrow Key Navigation ---
   if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) {
     return;
   }
 
   if (isDayCell) {
-    event.preventDefault(); // Prevent page scroll
+    event.preventDefault();
     navigateDayCellFocus(key, target);
   } else if (isMonthHeader && state.currentView === 'year') {
     event.preventDefault();
@@ -583,107 +482,72 @@ function handleGridKeyDown(event) {
   }
 }
 
-/**
- * Handles arrow key navigation between focusable day cells.
- * @param {string} key - The arrow key pressed.
- * @param {HTMLElement} currentCell - The currently focused cell.
- */
+
 function navigateDayCellFocus(key, currentCell) {
-  let focusableCells = [];
-  let currentIndex = -1;
-  let numColumns = 7; // Default for mini-grid and month/week without week number column
+    let focusableCells = [];
+    let currentIndex = -1;
+    let numColumns = 7;
+    let parentGrid = DOM_ELEMENTS.calendarGrid; // Default for month/week
 
-  if (state.currentView === 'month' || state.currentView === 'week') {
-    // Month/Week View (includes week number column, but cells are siblings)
-    // SYNTAX FIX: Used template literal for querySelectorAll argument
-    focusableCells = Array.from(
-      DOM_ELEMENTS.calendarGrid.querySelectorAll(`.${CSS_CLASSES.gridDayCell}:not(.${CSS_CLASSES.cellOtherMonth})[tabindex="0"]`)
-    );
+    if (state.currentView === 'year') {
+        parentGrid = currentCell.closest(`.${CSS_CLASSES.gridMiniCalendar}`);
+        if (!parentGrid) return;
+        focusableCells = Array.from(parentGrid.querySelectorAll(`.${CSS_CLASSES.gridMonthCell}:not(.${CSS_CLASSES.cellOtherMonth})[tabindex="0"]`));
+    } else { // Month or Week view
+        focusableCells = Array.from(parentGrid.querySelectorAll(`.${CSS_CLASSES.gridDayCell}:not(.${CSS_CLASSES.cellOtherMonth})[tabindex="0"]`));
+    }
+
     currentIndex = focusableCells.indexOf(currentCell);
-    numColumns = 7; // Effective columns for day cells
-
     if (currentIndex === -1) return;
+
     let nextIndex = -1;
 
     switch (key) {
-      case 'ArrowLeft':
-        nextIndex = (currentIndex % numColumns !== 0) ? currentIndex - 1 : -1; break;
-      case 'ArrowRight':
-        nextIndex = (currentIndex % numColumns !== numColumns - 1) ? currentIndex + 1 : -1; break;
-      case 'ArrowUp':
-        nextIndex = currentIndex - numColumns; break;
-      case 'ArrowDown':
-        nextIndex = currentIndex + numColumns; break;
+        case 'ArrowLeft':
+            nextIndex = (currentIndex % numColumns !== 0) ? currentIndex - 1 : -1;
+            break;
+        case 'ArrowRight':
+            nextIndex = (currentIndex % numColumns !== numColumns - 1) ? currentIndex + 1 : -1;
+            break;
+        case 'ArrowUp':
+            nextIndex = (currentIndex >= numColumns) ? currentIndex - numColumns : -1;
+            // Special handling for year view top row
+            if (state.currentView === 'year' && nextIndex === -1) {
+                 const monthContainer = parentGrid.closest(`.${CSS_CLASSES.gridMonthContainer}`);
+                 focusElement(monthContainer?.querySelector(`.${CSS_CLASSES.gridMonthHeader}`));
+                 return;
+            }
+            break;
+        case 'ArrowDown':
+            nextIndex = (currentIndex < focusableCells.length - numColumns) ? currentIndex + numColumns : -1;
+             // Special handling for year view bottom row
+            if (state.currentView === 'year' && nextIndex === -1) {
+                 const monthContainer = parentGrid.closest(`.${CSS_CLASSES.gridMonthContainer}`);
+                 const nextMonthContainer = monthContainer?.nextElementSibling;
+                 focusElement(nextMonthContainer?.querySelector(`.${CSS_CLASSES.gridMonthHeader}`));
+                 return;
+            }
+            break;
     }
 
     if (nextIndex >= 0 && nextIndex < focusableCells.length) {
-      focusableCells[nextIndex].focus();
+        focusElement(focusableCells[nextIndex]);
     }
-    // TODO: Handle jumping between weeks/months if ArrowUp/Down goes out of bounds?
-    // SYNTAX FIX: Removed extraneous text artifact below
-  } else if (state.currentView === 'year') {
-    // Year View (Mini-grids)
-    // SYNTAX FIX: Used template literal for closest() argument
-    const parentMiniGrid = currentCell.closest(`.${CSS_CLASSES.gridMiniCalendar}`);
-    if (!parentMiniGrid) return;
-    // SYNTAX FIX: Used template literal for querySelectorAll argument
-    focusableCells = Array.from(parentMiniGrid.querySelectorAll(`.${CSS_CLASSES.gridMonthCell}:not(.${CSS_CLASSES.cellOtherMonth})[tabindex="0"]`));
-    const miniIndex = focusableCells.indexOf(currentCell);
-    if (miniIndex === -1) return;
-
-    numColumns = 7; // Mini-grid always 7 wide
-    let nextIndex = -1;
-
-    switch (key) {
-      case 'ArrowLeft':
-        nextIndex = (miniIndex % numColumns !== 0) ? miniIndex - 1 : -1; break;
-      case 'ArrowRight':
-        nextIndex = (miniIndex % numColumns !== numColumns - 1) ? miniIndex + 1 : -1; break;
-      case 'ArrowUp':
-        if (miniIndex >= numColumns) { // Can move up within the same grid
-          nextIndex = miniIndex - numColumns;
-        } else { // At the top row, try moving to month header or prev month
-          // SYNTAX FIX: Used template literal for closest() argument
-          const monthContainer = parentMiniGrid.closest(`.${CSS_CLASSES.gridMonthContainer}`);
-          // SYNTAX FIX: Used template literal for querySelector() argument
-          focusElement(monthContainer?.querySelector(`.${CSS_CLASSES.gridMonthHeader}`)); // Focus header first
-          return; // Stop further processing
-        }
-        break;
-      case 'ArrowDown':
-        if (miniIndex < focusableCells.length - numColumns) { // Can move down within the same grid
-          nextIndex = miniIndex + numColumns;
-        } else { // At the bottom row, try moving to next month's header or cell
-          // SYNTAX FIX: Used template literal for closest() argument
-          const monthContainer = parentMiniGrid.closest(`.${CSS_CLASSES.gridMonthContainer}`);
-          const nextMonthContainer = monthContainer?.nextElementSibling;
-          // SYNTAX FIX: Used template literal for querySelector() argument
-          focusElement(nextMonthContainer?.querySelector(`.${CSS_CLASSES.gridMonthHeader}`)); // Focus next header
-          return; // Stop further processing
-        }
-        break;
-    }
-
-    if (nextIndex !== -1 && nextIndex < focusableCells.length) {
-      focusElement(focusableCells[nextIndex]);
-    }
-    // SYNTAX FIX: Removed extraneous text artifact below
-  }
+     // TODO: Add logic to potentially switch month/week/year if navigation goes out of bounds
 }
 
-/**
- * Handles arrow key navigation between focusable month headers in Year View.
- * @param {string} key - The arrow key pressed.
- * @param {HTMLElement} currentHeader - The currently focused header.
- */
+
 function navigateMonthHeaderFocus(key, currentHeader) {
-  // SYNTAX FIX: Used template literal for querySelectorAll argument
   const allHeaders = Array.from(DOM_ELEMENTS.calendarGrid.querySelectorAll(`.${CSS_CLASSES.gridMonthHeader}[tabindex="0"]`));
   const currentIndex = allHeaders.indexOf(currentHeader);
   if (currentIndex === -1) return;
 
   let nextIndex = -1;
-  const numColumns = window.getComputedStyle(DOM_ELEMENTS.calendarGrid).gridTemplateColumns.split(' ').length; // Estimate columns
+  let numColumns = 1; // Default assumption
+  try { // Safely get column count
+    numColumns = window.getComputedStyle(DOM_ELEMENTS.calendarGrid).gridTemplateColumns.split(' ').length;
+  } catch (e) { console.warn("Could not determine grid columns for keyboard nav."); }
+
 
   switch (key) {
     case 'ArrowLeft':
@@ -693,17 +557,13 @@ function navigateMonthHeaderFocus(key, currentHeader) {
     case 'ArrowUp':
       nextIndex = currentIndex >= numColumns ? currentIndex - numColumns : -1; break;
     case 'ArrowDown':
-      // If moving down from header, focus the first focusable day in that month's grid
-      // SYNTAX FIX: Used template literal for closest() argument
       const monthContainer = currentHeader.closest(`.${CSS_CLASSES.gridMonthContainer}`);
-      // SYNTAX FIX: Used template literal for querySelector() argument
       const firstDayCell = monthContainer?.querySelector(`.${CSS_CLASSES.gridMonthCell}:not(.${CSS_CLASSES.cellOtherMonth})[tabindex="0"]`);
       if (firstDayCell) {
         focusElement(firstDayCell);
-        return; // Stop default header navigation
+        return;
       }
-      // Fallback: try moving to header below if no day cell found
-      nextIndex = currentIndex + numColumns;
+      nextIndex = (currentIndex + numColumns < allHeaders.length) ? currentIndex + numColumns : -1;
       break;
   }
 
@@ -719,64 +579,46 @@ function focusElement(element) {
   }
 }
 
-/**
- * Updates the ARIA label of a cell to include/exclude the "Selected" state.
- * @param {HTMLElement} cellElement - The cell element.
- * @param {boolean} isSelected - Whether the cell is now selected.
- */
 function updateCellAriaLabel(cellElement, isSelected) {
   if (!cellElement || !cellElement.hasAttribute('aria-label')) return;
-
   let currentLabel = cellElement.getAttribute('aria-label') || '';
-  // SYNTAX FIX: Used template literal (backticks) for string assignment with interpolation
-  const selectedText = `, ${t('selected')}`; // Use translation helper
-
-  // Remove existing selected state text (simple replace)
+  const selectedText = `, ${t('selected')}`;
   currentLabel = currentLabel.replace(selectedText, '');
   if (isSelected) {
-    // Add selected state text
     currentLabel += selectedText;
   }
   cellElement.setAttribute('aria-label', currentLabel);
 }
 
-/**
- * Attaches or re-attaches event listeners to the grid.
- */
+/** Attaches or re-attaches event listeners to the grid. */
 export function attachGridListeners() {
-  // Remove previous listeners first to avoid duplicates
+  if (!DOM_ELEMENTS.calendarGrid) {
+      console.error("Cannot attach grid listeners, calendar grid element not found.");
+      return;
+  }
+  // Remove previous listener using the stored reference
   if (gridKeydownHandler) {
     DOM_ELEMENTS.calendarGrid.removeEventListener('keydown', gridKeydownHandler);
   }
-  // Remove potential old click listener (might be added multiple times otherwise)
-  // Consider making handleCalendarClick a stored reference if needed, but usually safe to remove/add
+  // Consider removing click listener if re-attaching, although less critical than keydown
   // DOM_ELEMENTS.calendarGrid.removeEventListener('click', handleCalendarClick);
 
-  if (DOM_ELEMENTS.calendarGrid) {
-    // Use capturing phase for click to potentially handle header clicks before day clicks if nested? Or keep bubbling. Bubbling is fine here.
-    DOM_ELEMENTS.calendarGrid.addEventListener('click', handleCalendarClick);
-    gridKeydownHandler = handleGridKeyDown; // Store reference
-    DOM_ELEMENTS.calendarGrid.addEventListener('keydown', gridKeydownHandler);
-    // SYNTAX FIX: Removed extraneous text artifact below
-  } else {
-    console.error("Cannot attach grid listeners, calendar grid element not found.");
-  }
+  DOM_ELEMENTS.calendarGrid.addEventListener('click', handleCalendarClick);
+  gridKeydownHandler = handleGridKeyDown; // Store new reference
+  DOM_ELEMENTS.calendarGrid.addEventListener('keydown', gridKeydownHandler);
 }
 
-/**
- * Applies highlight class to cells matching search results.
- * @param {Array} searchResults - Array of { date: Date, holidayInfo: object }.
- */
+/** Applies highlight class to cells matching search results. */
 function applySearchHighlights(searchResults) {
-  clearSearchHighlights(); // Clear previous ones first
+  clearSearchHighlights();
   if (!searchResults || searchResults.length === 0) return;
-
   const resultsMap = searchResults.reduce((map, item) => {
-    map[formatDateYYYYMMDD(item.date)] = true; // Assumes formatDateYYYYMMDD is available
+    if (item && item.date && isValid(item.date)) { // Add validation
+        map[formatDateYYYYMMDD(item.date)] = true;
+    }
     return map;
   }, {});
 
-  // Highlight across potentially multiple rendered views/mini-grids
   const cells = DOM_ELEMENTS.calendarGrid.querySelectorAll('[data-date]');
   cells.forEach(cell => {
     if (resultsMap[cell.dataset.date]) {
@@ -785,11 +627,8 @@ function applySearchHighlights(searchResults) {
   });
 }
 
-/**
- * Removes highlight class from all cells.
- */
+/** Removes highlight class from all cells. */
 function clearSearchHighlights() {
-  // SYNTAX FIX: Used template literal for querySelectorAll argument
   const highlighted = DOM_ELEMENTS.calendarGrid.querySelectorAll(`.${CSS_CLASSES.cellSearchHighlight}`);
   highlighted.forEach(cell => cell.classList.remove(CSS_CLASSES.cellSearchHighlight));
 }
